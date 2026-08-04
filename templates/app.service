@@ -1,0 +1,17 @@
+# 用户级 systemd 单元模板(放 ~/.config/systemd/user/<name>.service)
+# %h = 家目录;__NODE__ 由 deploy.sh 部署时 sed 替换为实际 node 路径。
+# 首次启用:loginctl enable-linger $USER && systemctl --user enable --now <name>
+[Unit]
+Description=<一句话描述>
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/myapp
+EnvironmentFile=%h/myapp/config.env
+ExecStart=__NODE__ %h/myapp/src/server.js
+Restart=on-failure
+RestartSec=5
+# 小内存机器加:Environment=NODE_OPTIONS=--max-old-space-size=256
+
+[Install]
+WantedBy=default.target
