@@ -82,6 +82,6 @@ agent 服务里调模型的统一抽象(同一份代码平移到所有项目,环
 
 ## 横向五件套 + 存储
 
-小型服务间平移复用的模块:`env.ts`(配置)/ `http.ts`(请求)/ `log.ts`(日志)/ `notify.ts`(Telegram 通知)/ `scheduler.ts`(调度)。
+小型服务间平移复用的模块:`env.ts`(配置)/ `http.ts`(请求)/ `log.ts`(日志)/ `notify.ts`(通知,详见 [06](06-通知系统.md))/ `scheduler.ts`(调度)。
 
 存储统一 SQLite(WAL 模式);表结构迁移用极简策略:**只加可空列**,维护一份 `ADDED_COLUMNS` 清单,启动时补列——够用十年。

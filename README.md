@@ -44,6 +44,7 @@
 | 约定 | 一句话 | 文档 |
 |------|--------|------|
 | 🤖 agent 工程约定 | CLAUDE.md 骨架、skill 规范、四种部署模式、模型三级后端、调度策略 | [docs/05-agent-工程约定.md](docs/05-agent-工程约定.md) |
+| 📣 通知系统 | agent 的反向通道:Telegram / Discord 可插拔推送,永不阻塞主流程、分级防轰炸 | [docs/06-通知系统.md](docs/06-通知系统.md) |
 
 ## 模板
 
@@ -54,6 +55,7 @@
 - [`config.env.example`](templates/config.env.example) — 配置模板约定(真实值永不入库)
 - [`deploy.sh`](templates/deploy.sh) — 零 sudo 用户级 systemd 部署脚本模板
 - [`app.service`](templates/app.service) — 用户级 systemd 单元模板
+- [`notify.mjs`](templates/notify.mjs) — 零依赖通知模块(Telegram + Discord 可插拔,限频、分段、429 退避)
 - [`gitignore`](templates/gitignore) — 默认排除清单
 
 ## 设计原则
