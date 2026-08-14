@@ -45,6 +45,20 @@
 |------|--------|------|
 | 🤖 agent 工程约定 | CLAUDE.md 骨架、skill 规范、四种部署模式、模型三级后端、调度策略 | [docs/05-agent-工程约定.md](docs/05-agent-工程约定.md) |
 | 📣 通知系统 | agent 的反向通道:Telegram / Discord 可插拔推送,永不阻塞主流程、分级防轰炸 | [docs/06-通知系统.md](docs/06-通知系统.md) |
+| 🗂️ 目录框架 | `$AGENT_ROOT` 下 projects / memory / skills 三分,项目只在 [registry/](registry/) 登记简介与 git 路径 | [docs/07-目录框架.md](docs/07-目录框架.md) |
+
+## 初始化与项目面板
+
+clone 本仓库后两步可用,零依赖(只需 Node ≥ 20 与 git):
+
+```bash
+./init.sh              # 交互式初始化:输入 GitHub token、域名、Cloudflare 授权 → 生成 config.env
+node web/server.mjs    # 启动项目面板 → http://127.0.0.1:8787
+```
+
+- **`init.sh`** 同时会:建好 `$AGENT_ROOT` 目录框架(docs/07)、clone 记忆/skill 仓库、把 `agent/` 初始化为你的**私有工作区**(独立 git 仓库,本仓库已 gitignore,存放个人 CLAUDE.md 等私有配置)。幂等,可重复运行。
+- **`web/`** 是项目面板:读取 [registry/](registry/) 登记簿渲染所有项目卡片(状态、部署位置、仓库与访问链接)。只监听 `127.0.0.1`,对外发布走 Tunnel + Access(docs/04)。
+- 真实配置只存在于 `config.env`(gitignore),模板见 [config.env.example](config.env.example)。
 
 ## 模板
 
@@ -71,6 +85,7 @@
 
 ## 如何开始
 
+0. **备齐依赖**(10 分钟核对):一台机器 + Cloudflare + 域名 + GitHub + Claude → [docs/00-依赖清单.md](docs/00-依赖清单.md)
 1. **搭知识库**(半天):装 Obsidian,建 vault,配同步 → [docs/01](docs/01-知识库.md)
 2. **开通 Cloudflare**(1 小时):域名 + R2 桶 + Tunnel + Access → [docs/02](docs/02-云存储.md) / [docs/04](docs/04-隧道与鉴权.md)
 3. **建个人网站**(半天):Docusaurus 初始化,wrangler 部署 → [docs/03](docs/03-个人网站.md)

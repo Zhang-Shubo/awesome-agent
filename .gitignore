@@ -1,1 +1,6 @@
+# 真实配置永不入库
+config.env
+# agent/ 是用户的私有工作区,独立 git 仓库(由 init.sh 创建)
+agent/
 .DS_Store
+node_modules/
