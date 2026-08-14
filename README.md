@@ -46,6 +46,7 @@
 | 🤖 agent 工程约定 | CLAUDE.md 骨架、skill 规范、四种部署模式、模型三级后端、调度策略 | [docs/05-agent-工程约定.md](docs/05-agent-工程约定.md) |
 | 📣 通知系统 | agent 的反向通道:Telegram / Discord 可插拔推送,永不阻塞主流程、分级防轰炸 | [docs/06-通知系统.md](docs/06-通知系统.md) |
 | 🗂️ 目录框架 | `$AGENT_ROOT` 下 projects / memory / skills 三分,项目只在 [registry/](registry/) 登记简介与 git 路径 | [docs/07-目录框架.md](docs/07-目录框架.md) |
+| 🚀 项目创建流程 | 定名字/域名/图标三要素 → 建仓 → 部署 → Access 先于 DNS → 验证 → 登记,20 分钟标准动线 | [docs/08-项目创建流程.md](docs/08-项目创建流程.md) |
 
 ## 初始化与项目面板
 
