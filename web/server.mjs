@@ -23,14 +23,14 @@ function readEnv(key) {
   return undefined
 }
 
-function parseEntry(file) {
-  const raw = fs.readFileSync(path.join(REGISTRY, file), 'utf8')
+function parseEntry(dir, file) {
+  const raw = fs.readFileSync(path.join(dir, file), 'utf8')
   const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   const meta = {}
   if (m) {
     for (const line of m[1].split('\n')) {
       const kv = line.match(/^([\w-]+):\s*([^#]*)/)
-      if (kv) meta[kv[1]] = kv[2].trim()
+      if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '')
     }
   }
   const body = (m ? m[2] : raw).trim()
@@ -40,19 +40,24 @@ function parseEntry(file) {
     repo: meta.repo || '',
     status: meta.status || 'active',
     runsOn: meta['runs-on'] || '',
+    kind: meta.kind || '',
+    entry: meta.entry || '',
     summary: body.replace(/\s+/g, ' ').slice(0, 300),
     url: link ? link[0].replace(/[),.;]$/, '') : '',
   }
 }
 
-function projects() {
-  if (!fs.existsSync(REGISTRY)) return []
-  return fs.readdirSync(REGISTRY)
+function listEntries(dir) {
+  if (!fs.existsSync(dir)) return []
+  return fs.readdirSync(dir)
     .filter(f => f.endsWith('.md') && !f.startsWith('_') && f !== 'README.md')
-    .map(f => { try { return parseEntry(f) } catch { return null } })
+    .map(f => { try { return parseEntry(dir, f) } catch { return null } })
     .filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name))
 }
+
+const projects = () => listEntries(REGISTRY)
+const agents = () => listEntries(path.join(REGISTRY, 'agents'))
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' }
 
@@ -61,6 +66,10 @@ http.createServer((req, res) => {
   if (url.pathname === '/api/projects') {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     return res.end(JSON.stringify({ ok: true, data: projects(), asOf: new Date().toISOString() }))
+  }
+  if (url.pathname === '/api/agents') {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+    return res.end(JSON.stringify({ ok: true, data: agents(), asOf: new Date().toISOString() }))
   }
   if (url.pathname === '/api/config') {
     const cfg = Object.fromEntries(SAFE_KEYS.map(k => [k, readEnv(k) || '']).filter(([, v]) => v))

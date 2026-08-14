@@ -3,30 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>agent 项目面板</title>
+<title>agent 面板</title>
 <style>
   :root {
     --bg: #f6f7f9; --card: #ffffff; --text: #1a1d21; --muted: #6b7280;
     --border: #e5e7eb; --accent: #4f46e5;
     --ok: #16a34a; --ok-bg: #f0fdf4; --pause: #d97706; --pause-bg: #fffbeb;
-    --arch: #6b7280; --arch-bg: #f3f4f6;
+    --arch: #6b7280; --arch-bg: #f3f4f6; --code-bg: #f3f4f6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #101317; --card: #181c22; --text: #e7eaee; --muted: #9aa3af;
       --border: #2a3038; --accent: #818cf8;
       --ok: #4ade80; --ok-bg: #12291a; --pause: #fbbf24; --pause-bg: #2b2110;
-      --arch: #9aa3af; --arch-bg: #22262c;
+      --arch: #9aa3af; --arch-bg: #22262c; --code-bg: #22262c;
     }
   }
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
-  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   h1 { font-size: 22px; }
   #domain { color: var(--muted); font-size: 13px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-  .filters { display: flex; gap: 8px; margin-bottom: 20px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 4px 0 24px; }
+  h2 { font-size: 17px; margin: 30px 0 4px; display: flex; align-items: center; gap: 8px; }
+  h2 .count { color: var(--muted); font-size: 13px; font-weight: 400; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
   .filters button { border: 1px solid var(--border); background: var(--card); color: var(--muted);
     border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; }
   .filters button.on { border-color: var(--accent); color: var(--accent); }
@@ -34,69 +37,100 @@
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
     display: flex; flex-direction: column; gap: 8px; }
   .card .top { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-  .card h2 { font-size: 16px; overflow-wrap: anywhere; }
+  .card h3 { font-size: 16px; overflow-wrap: anywhere; }
   .badge { font-size: 12px; border-radius: 999px; padding: 1px 10px; white-space: nowrap; }
-  .badge.active   { color: var(--ok);    background: var(--ok-bg); }
-  .badge.paused   { color: var(--pause); background: var(--pause-bg); }
-  .badge.archived { color: var(--arch);  background: var(--arch-bg); }
+  .badge.active      { color: var(--ok);    background: var(--ok-bg); }
+  .badge.paused      { color: var(--pause); background: var(--pause-bg); }
+  .badge.archived    { color: var(--arch);  background: var(--arch-bg); }
+  .badge.interactive { color: var(--accent); background: var(--arch-bg); }
+  .badge.service     { color: var(--ok);    background: var(--ok-bg); }
+  .badge.scheduled   { color: var(--pause); background: var(--pause-bg); }
   .summary { font-size: 13.5px; color: var(--muted); flex: 1; }
+  .entry { font: 12.5px/1.8 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code-bg);
+    border-radius: 8px; padding: 2px 10px; overflow-x: auto; white-space: nowrap; }
   .meta { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
   .meta a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
   .meta a:hover { text-decoration: underline; }
   .empty { color: var(--muted); border: 1px dashed var(--border); border-radius: 12px;
-    padding: 40px; text-align: center; }
-  footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+    padding: 32px; text-align: center; font-size: 13.5px; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header><h1>🤖 agent 项目面板</h1><span id="domain"></span></header>
-  <div class="sub">数据来自 <code>registry/</code> 登记簿 —— 一个项目一个文件,只登记简介与 git 路径。</div>
-  <div class="filters" id="filters"></div>
-  <div class="grid" id="grid"></div>
-  <div class="empty" id="empty" hidden>registry/ 里还没有登记任何项目。<br>拷贝 <code>registry/_example.md</code> 登记你的第一个项目。</div>
+  <header><h1>🤖 agent 面板</h1><span id="domain"></span></header>
+  <div class="sub">数据来自 <code>registry/</code> 登记簿 —— 项目与 agent 各一个文件一条,改文件即改面板。</div>
+
+  <h2>📁 项目 <span class="count" id="p-count"></span></h2>
+  <div class="hint">登记于 <code>registry/*.md</code>:简介 + git 路径 + 状态。</div>
+  <div class="filters" id="p-filters"></div>
+  <div class="grid" id="p-grid"></div>
+  <div class="empty" id="p-empty" hidden>registry/ 里还没有登记项目 —— 拷贝 <code>registry/_example.md</code> 登记第一个。</div>
+
+  <h2>🦾 agent <span class="count" id="a-count"></span></h2>
+  <div class="hint">登记于 <code>registry/agents/*.md</code>:名字 + 类型 + 所在机器 + 入口。</div>
+  <div class="grid" id="a-grid"></div>
+  <div class="empty" id="a-empty" hidden>还没有登记 agent —— 拷贝 <code>registry/agents/_example.md</code> 登记第一个。</div>
+
   <footer id="asof"></footer>
 </div>
 <script>
 const STATUS = { active: '运行中', paused: '暂停', archived: '已归档' }
-let all = [], cur = 'all'
+const KIND = { interactive: '交互对话', service: '常驻服务', scheduled: '定时任务' }
+let projects = [], agents = [], cur = 'all'
 
-function esc(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])) }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+const repoUrl = r => { const m = r.match(/^git@([^:]+):(.+?)(\.git)?$/); return m ? `https://${m[1]}/${m[2]}` : r }
 
-function render() {
-  const list = cur === 'all' ? all : all.filter(p => p.status === cur)
-  const grid = document.getElementById('grid')
-  grid.innerHTML = list.map(p => `
+function metaLine(p) {
+  return `<div class="meta">
+    ${p.runsOn ? `<span>📍 ${esc(p.runsOn)}</span>` : ''}
+    ${p.repo ? `<a href="${esc(repoUrl(p.repo))}" target="_blank" rel="noopener">仓库</a>` : ''}
+    ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">访问 ↗</a>` : ''}
+  </div>`
+}
+
+function renderProjects() {
+  const list = cur === 'all' ? projects : projects.filter(p => p.status === cur)
+  document.getElementById('p-grid').innerHTML = list.map(p => `
     <div class="card">
-      <div class="top"><h2>${esc(p.name)}</h2>
+      <div class="top"><h3>${esc(p.name)}</h3>
         <span class="badge ${esc(p.status)}">${STATUS[p.status] || esc(p.status)}</span></div>
       <div class="summary">${esc(p.summary) || '（暂无简介）'}</div>
-      <div class="meta">
-        ${p.runsOn ? `<span>📍 ${esc(p.runsOn)}</span>` : ''}
-        ${p.repo ? `<a href="${esc(repoUrl(p.repo))}" target="_blank" rel="noopener">仓库</a>` : ''}
-        ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">访问 ↗</a>` : ''}
-      </div>
+      ${metaLine(p)}
     </div>`).join('')
-  document.getElementById('empty').hidden = list.length > 0
-  const counts = { all: all.length }
-  for (const p of all) counts[p.status] = (counts[p.status] || 0) + 1
-  document.getElementById('filters').innerHTML =
+  document.getElementById('p-empty').hidden = list.length > 0
+  document.getElementById('p-count').textContent = projects.length || ''
+  const counts = { all: projects.length }
+  for (const p of projects) counts[p.status] = (counts[p.status] || 0) + 1
+  document.getElementById('p-filters').innerHTML =
     [['all','全部'],['active','运行中'],['paused','暂停'],['archived','已归档']]
       .filter(([k]) => k === 'all' || counts[k])
-      .map(([k, label]) => `<button class="${cur===k?'on':''}" onclick="cur='${k}';render()">${label} ${counts[k]||0}</button>`).join('')
+      .map(([k, label]) => `<button class="${cur===k?'on':''}" onclick="cur='${k}';renderProjects()">${label} ${counts[k]||0}</button>`).join('')
 }
 
-function repoUrl(r) {
-  const m = r.match(/^git@([^:]+):(.+?)(\.git)?$/)
-  return m ? `https://${m[1]}/${m[2]}` : r
+function renderAgents() {
+  document.getElementById('a-grid').innerHTML = agents.map(a => `
+    <div class="card">
+      <div class="top"><h3>${esc(a.name)}</h3>
+        <span class="badge ${esc(a.kind) || 'interactive'}">${KIND[a.kind] || esc(a.kind) || '—'}</span></div>
+      <div class="summary">${esc(a.summary) || '（暂无简介）'}</div>
+      ${a.entry ? `<div class="entry">${esc(a.entry)}</div>` : ''}
+      ${metaLine(a)}
+    </div>`).join('')
+  document.getElementById('a-empty').hidden = agents.length > 0
+  document.getElementById('a-count').textContent = agents.length || ''
 }
 
-fetch('/api/projects').then(r => r.json()).then(({ data, asOf }) => {
-  all = data; render()
-  document.getElementById('asof').textContent = `数据截至 ${new Date(asOf).toLocaleString()}`
-})
-fetch('/api/config').then(r => r.json()).then(({ data }) => {
-  if (data.DOMAIN) document.getElementById('domain').textContent = data.DOMAIN
+Promise.all([
+  fetch('/api/projects').then(r => r.json()),
+  fetch('/api/agents').then(r => r.json()),
+  fetch('/api/config').then(r => r.json()),
+]).then(([p, a, cfg]) => {
+  projects = p.data; agents = a.data
+  renderProjects(); renderAgents()
+  document.getElementById('asof').textContent = `数据截至 ${new Date(p.asOf).toLocaleString()}`
+  if (cfg.data.DOMAIN) document.getElementById('domain').textContent = cfg.data.DOMAIN
 })
 </script>
 </body>
