@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url'
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const REGISTRY = path.join(ROOT, 'registry')
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), 'static')
+// React 版(web-react,liquid-glass-react)构建产物存在时优先;缺的文件(壁纸等)落回 static
+const REACT_DIST = path.join(ROOT, 'web-react', 'dist')
+const STATIC_DIRS = [REACT_DIST, STATIC].filter(d => fs.existsSync(d))
 const PORT = Number(process.env.PANEL_PORT || readEnv('PANEL_PORT') || 8787)
 
 // config.env 只取白名单键给前端,密钥永不出后端
@@ -76,15 +79,17 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     return res.end(JSON.stringify({ ok: true, data: cfg }))
   }
-  // 静态文件,禁止路径穿越
+  // 静态文件,禁止路径穿越;按目录优先级找(React dist → static)
   const rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1)
-  const file = path.join(STATIC, rel)
-  if (!file.startsWith(STATIC) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
-    return res.end('not found')
+  for (const dir of STATIC_DIRS) {
+    const file = path.join(dir, rel)
+    if (file.startsWith(dir) && fs.existsSync(file) && fs.statSync(file).isFile()) {
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' })
+      return res.end(fs.readFileSync(file))
+    }
   }
-  res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' })
-  res.end(fs.readFileSync(file))
+  res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
+  res.end('not found')
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`awesome-agent panel → http://127.0.0.1:${PORT}`)
 })
