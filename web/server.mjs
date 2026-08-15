@@ -4,6 +4,10 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const execFileP = promisify(execFile)
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const REGISTRY = path.join(ROOT, 'registry')
@@ -96,6 +100,22 @@ function entryMd(b) {
 }
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/
+
+// 新增 app 只填链接:claude -p(headless)读取链接内容,解析出登记字段
+async function resolveLink(link) {
+  const prompt = `分析这个链接:${link}
+用 WebFetch 读取它的内容后,只输出一个 JSON 对象,不要输出任何其他文字:
+{"name":"kebab-case 短名(小写字母数字横线)","icon":"一个最贴切的 emoji","summary":"一句话中文简介","repo":"若它是代码仓库,其 https clone 地址,否则空字符串","url":"若它是可直接访问的服务或网页,该链接本身,否则空字符串"}`
+  const { stdout } = await execFileP(
+    'claude', ['-p', prompt, '--allowedTools', 'WebFetch', '--output-format', 'json'],
+    { timeout: 180000, maxBuffer: 1024 * 1024 },
+  )
+  const m = String(JSON.parse(stdout).result || '').match(/\{[\s\S]*\}/)
+  if (!m) throw new Error('claude 未返回 JSON')
+  const r = JSON.parse(m[0])
+  r.name = String(r.name || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
+  return r
+}
 const readBody = (req) => new Promise((resolve) => {
   let s = ''
   req.on('data', (c) => { s += c })
@@ -121,6 +141,10 @@ http.createServer(async (req, res) => {
     if (req.method === 'POST') {
       let b
       try { b = JSON.parse(await readBody(req)) } catch { return send(400, { ok: false, error: 'JSON 解析失败' }) }
+      if (!isAgents && b.link && !b.name) {
+        try { b = { ...(await resolveLink(String(b.link).trim())), status: 'active' } }
+        catch (e) { return send(500, { ok: false, error: `链接解析失败:${String(e.message || e).slice(0, 200)}` }) }
+      }
       if (!NAME_RE.test(b.name || '')) return send(400, { ok: false, error: 'name 需为小写字母/数字/横线(kebab-case)' })
       fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(path.join(dir, `${b.name}.md`), entryMd(b))

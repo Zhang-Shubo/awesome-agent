@@ -27,56 +27,68 @@ function Tile({ icon, name, href, editing, onDelete, children }) {
 
 function AddForm({ kind, onClose, onSaved }) {
   const isAgent = kind === 'agents'
-  const [f, setF] = useState({ name: '', icon: '', repo: '', url: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
+  const [f, setF] = useState({ link: '', name: '', icon: '', repo: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
   const save = async () => {
-    if (!/^[a-z0-9][a-z0-9_-]*$/.test(f.name)) return setErr('名字需为小写字母/数字/横线,如 my-app')
-    const body = { name: f.name, icon: f.icon, repo: f.repo, url: f.url, summary: f.summary, status: f.status }
-    if (isAgent) { body.kind = f.agentKind; body.entry = f.entry }
-    const r = await fetch(`/api/${kind}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-    })
-    const d = await r.json()
-    if (!d.ok) return setErr(d.error || '保存失败')
-    onSaved()
+    let body
+    if (isAgent) {
+      if (!/^[a-z0-9][a-z0-9_-]*$/.test(f.name)) return setErr('名字需为小写字母/数字/横线,如 my-agent')
+      body = { name: f.name, icon: f.icon, repo: f.repo, summary: f.summary, status: f.status, kind: f.agentKind, entry: f.entry }
+    } else {
+      if (!f.link.trim()) return setErr('填一个链接(仓库或服务地址)')
+      body = { link: f.link.trim() }
+    }
+    setErr(''); setBusy(true)
+    try {
+      const r = await fetch(`/api/${kind}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const d = await r.json()
+      if (!d.ok) return setErr(d.error || '保存失败')
+      onSaved()
+    } catch (e) { setErr(String(e.message || e)) } finally { setBusy(false) }
   }
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay" onClick={busy ? undefined : onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>新增 {isAgent ? 'Agent' : 'APP'}<span className="modal-sub">写入私有登记簿</span></h3>
-        <div className="field"><label>名字 *(kebab-case)</label>
-          <input value={f.name} onChange={set('name')} placeholder="my-app" /></div>
-        <div className="field-row">
-          <div className="field"><label>图标(emoji)</label>
-            <input value={f.icon} onChange={set('icon')} placeholder="📦" /></div>
-          <div className="field"><label>状态</label>
-            <select value={f.status} onChange={set('status')}>
-              {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select></div>
-        </div>
-        {isAgent && (
-          <div className="field-row">
-            <div className="field"><label>类型</label>
-              <select value={f.agentKind} onChange={set('agentKind')}>
-                {Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></div>
+        {isAgent ? (
+          <>
+            <h3>新增 Agent<span className="modal-sub">写入私有登记簿</span></h3>
+            <div className="field"><label>名字 *(kebab-case)</label>
+              <input value={f.name} onChange={set('name')} placeholder="my-agent" /></div>
+            <div className="field-row">
+              <div className="field"><label>图标(emoji)</label>
+                <input value={f.icon} onChange={set('icon')} placeholder="🦾" /></div>
+              <div className="field"><label>类型</label>
+                <select value={f.agentKind} onChange={set('agentKind')}>
+                  {Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select></div>
+            </div>
             <div className="field"><label>入口命令</label>
               <input value={f.entry} onChange={set('entry')} placeholder="claude" /></div>
-          </div>
+            <div className="field"><label>简介</label>
+              <textarea rows="3" value={f.summary} onChange={set('summary')} placeholder="一句话说清它是干什么的" /></div>
+          </>
+        ) : (
+          <>
+            <h3>新增 APP<span className="modal-sub">填链接,AI 解析后自动登记</span></h3>
+            <div className="field"><label>链接 *(仓库或服务地址)</label>
+              <input value={f.link} onChange={set('link')} disabled={busy}
+                placeholder="https://github.com/you/my-app 或 http://127.0.0.1:8xxx"
+                onKeyDown={(e) => e.key === 'Enter' && !busy && save()} /></div>
+            <div className="form-hint">名字、图标、简介由 claude 读取链接内容自动生成,写入私有登记簿。</div>
+          </>
         )}
-        <div className="field"><label>仓库</label>
-          <input value={f.repo} onChange={set('repo')} placeholder="git@github.com:you/my-app.git" /></div>
-        <div className="field"><label>访问入口(URL,选填)</label>
-          <input value={f.url} onChange={set('url')} placeholder="http://127.0.0.1:8xxx" /></div>
-        <div className="field"><label>简介</label>
-          <textarea rows="3" value={f.summary} onChange={set('summary')} placeholder="一句话说清它是干什么的" /></div>
         {err && <div className="form-err">{err}</div>}
         <div className="actions">
-          <button className="btn2" onClick={onClose}>取消</button>
-          <button className="btn2 primary" onClick={save}>保存</button>
+          <button className="btn2" onClick={onClose} disabled={busy}>取消</button>
+          <button className="btn2 primary" onClick={save} disabled={busy}>
+            {busy ? '解析中…' : '保存'}
+          </button>
         </div>
       </div>
     </div>
