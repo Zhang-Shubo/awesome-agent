@@ -103,6 +103,16 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .theme-btn { bottom: 24px; }
 
+/* 编辑模式:图标抖动(仿 iOS 主屏),错开相位免得整齐划一 */
+@keyframes jiggle {
+  0%, 100% { transform: rotate(-1.8deg); }
+  50% { transform: rotate(1.8deg); }
+}
+.launcher.editing .tile:not(.add) { animation: jiggle 0.3s ease-in-out infinite; }
+.launcher.editing .tile:not(.add):nth-child(2n) { animation-duration: 0.34s; animation-delay: -0.15s; }
+.launcher.editing .tile:not(.add):nth-child(3n) { animation-duration: 0.27s; animation-delay: -0.08s; }
+@media (prefers-reduced-motion: reduce) { .launcher.editing .tile { animation: none; } }
+
 /* 编辑模式:删除角标 + 新增瓷贴 */
 .tile-del {
   position: absolute; top: -8px; right: 8px; z-index: 5;
