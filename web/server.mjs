@@ -11,7 +11,7 @@ const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), 'static')
 const PORT = Number(process.env.PANEL_PORT || readEnv('PANEL_PORT') || 8787)
 
 // config.env 只取白名单键给前端,密钥永不出后端
-const SAFE_KEYS = ['DOMAIN', 'GIT_USER', 'AGENT_ROOT']
+const SAFE_KEYS = ['DOMAIN', 'GIT_USER', 'AGENT_ROOT', 'WALLPAPER']
 
 function readEnv(key) {
   const file = path.join(ROOT, 'config.env')
@@ -59,7 +59,7 @@ function listEntries(dir) {
 const projects = () => listEntries(REGISTRY)
 const agents = () => listEntries(path.join(REGISTRY, 'agents'))
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' }
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
 
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost')

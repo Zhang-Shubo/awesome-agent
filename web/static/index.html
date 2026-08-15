@@ -50,6 +50,18 @@
   }
   @media (prefers-reduced-motion: reduce) { .aurora i { animation: none; } }
 
+  /* ── 壁纸背景(替代 aurora,底部切换器选择) ─────────────── */
+  .wallpaper { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; display: none; }
+  .wallpaper::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.08); }
+  @media (prefers-color-scheme: dark) { .wallpaper::after { background: rgba(5, 8, 14, 0.35); } }
+  html.has-wallpaper .wallpaper { display: block; }
+  html.has-wallpaper .aurora { display: none; }
+  .bg-picker { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .bg-picker button { width: 34px; height: 24px; border-radius: 7px; border: 2px solid transparent; cursor: pointer;
+    background-size: cover; background-position: center; padding: 0; font-size: 11px; color: var(--muted); }
+  .bg-picker button.aurora-thumb { background: linear-gradient(120deg, var(--blob-a), var(--blob-b), var(--blob-c)); }
+  .bg-picker button.on { border-color: var(--accent); }
+
   /* ── 液态玻璃材质 ──────────────────────────────────────────
      基础:半透明底 + backdrop 模糊/增饱和 + 高光内描边 + 外投影。
      Chromium 下 JS 加 html.liquid,叠加 SVG feDisplacementMap 置换滤镜
@@ -109,8 +121,9 @@
 </style>
 </head>
 <body>
-<!-- 背景光斑层 -->
+<!-- 背景光斑层 / 壁纸层(二选一,底部切换) -->
 <div class="aurora"><i></i><i></i><i></i><i></i></div>
+<div class="wallpaper" id="wallpaper"></div>
 
 <!-- 液态置换滤镜:feTurbulence 生成置换图(免外部 PNG),feDisplacementMap 扭曲背景。
      仅 Chromium 支持 SVG 滤镜作 backdrop-filter 输入,由 JS 探测后启用。 -->
@@ -137,7 +150,10 @@
   <div class="grid" id="a-grid"></div>
   <div class="empty glass" id="a-empty" hidden>还没有登记 agent —— 拷贝 <code>registry/agents/_example.md</code> 登记第一个。</div>
 
-  <footer id="asof"></footer>
+  <footer>
+    <span id="asof"></span>
+    <div class="bg-picker" id="bg-picker" title="背景"></div>
+  </footer>
 </div>
 <script>
 // Chromium 才支持 SVG 滤镜进 backdrop-filter;其余浏览器保持普通磨砂玻璃
@@ -190,6 +206,24 @@ function renderAgents() {
   document.getElementById('a-count').textContent = agents.length || ''
 }
 
+// ── 背景切换:aurora 光斑或 wallpapers/ 壁纸;优先级 本地记忆 > config ──
+const WALLS = ['1.jpg', '2.jpg', '3.jpg', '4.jpg', '5.jpg', '6.jpg']
+function setBg(name, save) {
+  const wp = name && name !== 'aurora'
+  document.documentElement.classList.toggle('has-wallpaper', wp)
+  if (wp) document.getElementById('wallpaper').style.backgroundImage = `url(wallpapers/${name})`
+  if (save) localStorage.setItem('panel-bg', name || 'aurora')
+  document.querySelectorAll('.bg-picker button').forEach(b =>
+    b.classList.toggle('on', (b.dataset.bg || 'aurora') === (name || 'aurora')))
+}
+function initBgPicker(cfgWall) {
+  document.getElementById('bg-picker').innerHTML =
+    `<button class="aurora-thumb" data-bg="aurora" onclick="setBg('aurora',1)" title="极光"></button>` +
+    WALLS.map(w => `<button data-bg="${w}" style="background-image:url(wallpapers/${w})"
+       onclick="setBg('${w}',1)" title="${w}"></button>`).join('')
+  setBg(localStorage.getItem('panel-bg') || cfgWall || 'aurora')
+}
+
 Promise.all([
   fetch('/api/projects').then(r => r.json()),
   fetch('/api/agents').then(r => r.json()),
@@ -199,6 +233,7 @@ Promise.all([
   renderProjects(); renderAgents()
   document.getElementById('asof').textContent = `数据截至 ${new Date(p.asOf).toLocaleString()}`
   if (cfg.data.DOMAIN) document.getElementById('domain').textContent = cfg.data.DOMAIN
+  initBgPicker(cfg.data.WALLPAPER)
 })
 </script>
 </body>
