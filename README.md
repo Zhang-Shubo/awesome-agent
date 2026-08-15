@@ -60,7 +60,7 @@ node web/server.mjs    # 启动项目面板 → http://127.0.0.1:8787
 
 - **`init.sh`** 同时会:建好 `$AGENT_ROOT` 目录框架(docs/07)、clone 记忆/skill 仓库、把 `agent/` 初始化为你的**私有工作区**(独立 git 仓库,本仓库已 gitignore,存放个人 CLAUDE.md 等私有配置)。幂等,可重复运行。
 - **`web/`** 是项目面板:读取 [registry/](registry/) 登记簿渲染项目列表与 agent 列表。只监听 `127.0.0.1`,对外发布走 Tunnel + Access(docs/04)。
-- **`web-react/`** 是面板的 React 版(玻璃拟态启动台:APP/Agent 图标 + 悬浮详情 + 编辑模式,新增 APP 只填链接由 claude 解析):`cd web-react && npm install && npm run build` 后,server 自动优先托管构建产物;不构建则用 `web/static` 零依赖版,两版共用同一套 API。
+- **`web-react/`** 是面板的 React 版(玻璃拟态启动台:APP/Agent 图标 + 悬浮详情 + 编辑模式,新增 APP 只填链接由 claude 解析):`cd web-react && npm install && npm run build` 后,server 自动优先托管构建产物;不构建则用 `web/static` 零依赖版,两版共用同一套 API。面板里有只会溜达的桌宠 boba(来自 [petdex.dev](https://petdex.dev),MIT):点它会跳,想换宠物就替换 `web-react/public/pet/spritesheet.webp`(Codex sprite v2 同格式),删掉该文件即无宠物。
 - 真实配置只存在于 `config.env`(gitignore),模板见 [config.env.example](config.env.example)。
 
 ## 模板

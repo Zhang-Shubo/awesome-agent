@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Pet from './Pet.jsx'
 
 // 启动台式面板:APP 与 Agent 两组小图标,详情悬浮显示。
 // 编辑模式:新增/删除,写操作全部落私有登记簿(见 docs/07),公共库不被 web 改动。
@@ -130,7 +131,7 @@ export default function App() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
-      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, a, button, input, select, textarea')
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
       if (editingRef.current || !blank(e)) return
@@ -206,6 +207,7 @@ export default function App() {
           </>
         ), (a) => KIND_ICON[a.kind] || '🦾')}
       </div>
+      <Pet />
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}
       <button className="fab theme-btn" title="切换亮暗模式"

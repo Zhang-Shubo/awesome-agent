@@ -103,6 +103,15 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .theme-btn { bottom: 24px; }
 
+/* 桌宠(petdex.dev 的 boba,MIT):底部游走,逐帧雪碧图 */
+.pet { position: fixed; bottom: 0; left: 0; z-index: 25; cursor: pointer; width: 70px; height: 76px; overflow: hidden; }
+.pet i {
+  display: block; width: 96px; height: 104px;
+  background: url(/pet/spritesheet.webp) no-repeat;
+  transform: scale(0.73); transform-origin: top left;
+}
+@media (prefers-reduced-motion: reduce) { .pet { display: none; } }
+
 /* 编辑模式:图标抖动(仿 iOS 主屏),错开相位免得整齐划一 */
 @keyframes jiggle {
   0%, 100% { transform: rotate(-1.8deg); }
