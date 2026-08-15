@@ -45,6 +45,7 @@ function parseEntry(dir, file) {
     runsOn: meta['runs-on'] || '',
     kind: meta.kind || '',
     entry: meta.entry || '',
+    icon: meta.icon || '',
     summary: body.replace(/\s+/g, ' ').slice(0, 300),
     url: link ? link[0].replace(/[),.;]$/, '') : '',
   }

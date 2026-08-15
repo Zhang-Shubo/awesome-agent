@@ -13,11 +13,10 @@ const repoUrl = (r) => {
 // 液态玻璃卡片:liquid-glass-react 提供折射/色差/弹性,参数取库推荐值。
 // 该组件恒定 translate(-50%,-50%) 居中(为浮动元素设计),要进文档流需要:
 // 外层定位壳 + 隐形同款内容撑出尺寸,玻璃绝对定位居中覆盖。
-const GLASS_PAD = '16px 18px'
-function Glass({ children, radius = 18, container, overLight }) {
+function Glass({ children, radius = 18, container, overLight, pad = '16px 18px' }) {
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ visibility: 'hidden', padding: GLASS_PAD }} aria-hidden>
+      <div style={{ visibility: 'hidden', padding: pad }} aria-hidden>
         {children}
       </div>
       <LiquidGlass
@@ -27,7 +26,7 @@ function Glass({ children, radius = 18, container, overLight }) {
         aberrationIntensity={2}
         elasticity={0.12}
         cornerRadius={radius}
-        padding={GLASS_PAD}
+        padding={pad}
         mouseContainer={container}
         overLight={overLight}
         style={{ position: 'absolute', top: '50%', left: '50%' }}
@@ -101,17 +100,19 @@ export default function App() {
               </span>
             ))}
         </div>
-        <div className="grid">
-          {shown.map((p) => (
-            <Glass key={p.name} container={pageRef} overLight={overLight}>
-              <div className="card-body">
-                <div className="top"><h3>{p.name}</h3>
-                  <span className={`badge ${p.status}`}>{STATUS[p.status] || p.status}</span></div>
-                <div className="summary">{p.summary || '（暂无简介）'}</div>
-                <Meta item={p} />
-              </div>
-            </Glass>
-          ))}
+        <div className="grid tiles">
+          {shown.map((p) => {
+            const href = p.url || (p.repo && repoUrl(p.repo))
+            return (
+              <Glass key={p.name} container={pageRef} overLight={overLight} pad="18px 14px">
+                <a className="tile" href={href || undefined} target="_blank" rel="noopener noreferrer"
+                  title={p.summary}>
+                  <span className="tile-icon">{p.icon || '📦'}</span>
+                  <span className="tile-name">{p.name}</span>
+                </a>
+              </Glass>
+            )
+          })}
         </div>
         {!shown.length && <div className="empty">registry/ 里还没有登记项目 —— 拷贝 <code>registry/_example.md</code> 登记第一个。</div>}
 

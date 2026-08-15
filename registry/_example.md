@@ -1,5 +1,6 @@
 ---
 name: trade-agent
+icon: 📈                # 面板卡片图标(emoji)
 repo: git@github.com:your-name/trade-agent.git
 status: active          # active | paused | archived
 runs-on: vps            # local | vps | gpu | 多个用逗号分隔

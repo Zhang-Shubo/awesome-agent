@@ -46,6 +46,12 @@ h2 .count { color: var(--muted); font-size: 13px; font-weight: 400; }
 .filters .chip { color: var(--text); font-size: 13px; cursor: pointer; user-select: none; }
 .filters .chip.on { color: var(--accent); font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+/* 项目:极简瓷贴 —— 只有图标 + 名字,悬停看简介(title),点击进入 */
+.grid.tiles { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-decoration: none; color: var(--text); cursor: pointer; min-width: 96px; }
+.tile-icon { font-size: 34px; line-height: 1; }
+.tile-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; text-align: center; }
 .card-body { display: flex; flex-direction: column; gap: 8px; min-width: 260px; }
 .card-body .top { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
 .card-body h3 { font-size: 16px; overflow-wrap: anywhere; }

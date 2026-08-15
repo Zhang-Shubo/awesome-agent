@@ -1,5 +1,6 @@
 ---
 name: info-feed
+icon: 🌊
 repo: git@github.com:Zhang-Shubo/info-feed.git
 status: active
 runs-on: local
