@@ -91,11 +91,57 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .empty code { font-size: 13px; }
 
-/* 右下角亮暗切换 */
-.theme-btn {
-  position: fixed; right: 24px; bottom: 24px; z-index: 30;
+/* 右下角悬浮按钮:亮暗切换 + 编辑模式 */
+.fab {
+  position: fixed; right: 24px; z-index: 30;
   width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--glass-border);
   background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow);
   font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--text);
 }
+.theme-btn { bottom: 24px; }
+.edit-btn { bottom: 82px; }
+
+/* 编辑模式:删除角标 + 新增瓷贴 */
+.tile-del {
+  position: absolute; top: -8px; right: 8px; z-index: 5;
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: #ef4444; color: #fff; font-size: 12px; line-height: 1; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.tile.add { border: none; background: transparent; padding: 0; font: inherit; color: var(--muted); }
+.tile.add .tile-icon { background: transparent; border-style: dashed; font-size: 26px; }
+
+/* 新增表单弹窗 */
+.overlay {
+  position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal {
+  width: min(440px, 94vw); max-height: 90vh; overflow-y: auto;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border); border-radius: 18px; box-shadow: var(--shadow);
+  padding: 24px;
+}
+.modal h3 { font-size: 18px; font-weight: 700; display: flex; align-items: baseline; gap: 10px; }
+.modal-sub { font-size: 12px; font-weight: 400; color: var(--muted); }
+.field { margin-top: 12px; flex: 1; }
+.field-row { display: flex; gap: 12px; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+.field input, .field select, .field textarea {
+  width: 100%; border: 1px solid var(--glass-border); background: var(--glass);
+  border-radius: 10px; padding: 9px 12px; font-family: inherit; font-size: 14px;
+  color: var(--text); resize: vertical;
+}
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid rgba(99, 102, 241, 0.4); }
+.form-err { color: #ef4444; font-size: 13px; margin-top: 10px; }
+.actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.btn2 {
+  border-radius: 999px; padding: 8px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--glass-border); background: var(--glass); color: var(--text);
+}
+.btn2.primary { background: #0e1116; color: #fff; border-color: transparent; }
+:root[data-theme="dark"] .btn2.primary { background: #f1f4f8; color: #0e1116; }

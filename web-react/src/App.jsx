@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
-// 启动台式面板:APP(项目)与 Agent 两组小图标,详情悬浮图标才显示。
+// 启动台式面板:APP 与 Agent 两组小图标,详情悬浮显示。
+// 编辑模式:新增/删除,写操作全部落私有登记簿(见 docs/07),公共库不被 web 改动。
 const STATUS = { active: '运行中', paused: '暂停', archived: '已归档' }
 const KIND = { interactive: '交互对话', service: '常驻服务', scheduled: '定时任务' }
 const KIND_ICON = { interactive: '💬', service: '🛰️', scheduled: '⏰' }
@@ -10,79 +11,153 @@ const repoUrl = (r) => {
   return m ? `https://${m[1]}/${m[2]}` : r
 }
 
-function Tile({ icon, name, href, children }) {
-  const Tag = href ? 'a' : 'div'
+function Tile({ icon, name, href, editing, onDelete, children }) {
+  const Tag = href && !editing ? 'a' : 'div'
   return (
-    <Tag className="tile" {...(href ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
+    <Tag className="tile" {...(href && !editing ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
+      {editing && (
+        <button className="tile-del" title="删除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}>✕</button>
+      )}
       <span className="tile-icon">{icon}</span>
       <span className="tile-name">{name}</span>
-      <div className="pop">{children}</div>
+      {!editing && <div className="pop">{children}</div>}
     </Tag>
   )
 }
 
+function AddForm({ kind, onClose, onSaved }) {
+  const isAgent = kind === 'agents'
+  const [f, setF] = useState({ name: '', icon: '', repo: '', url: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
+  const [err, setErr] = useState('')
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+
+  const save = async () => {
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(f.name)) return setErr('名字需为小写字母/数字/横线,如 my-app')
+    const body = { name: f.name, icon: f.icon, repo: f.repo, url: f.url, summary: f.summary, status: f.status }
+    if (isAgent) { body.kind = f.agentKind; body.entry = f.entry }
+    const r = await fetch(`/api/${kind}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    })
+    const d = await r.json()
+    if (!d.ok) return setErr(d.error || '保存失败')
+    onSaved()
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>新增 {isAgent ? 'Agent' : 'APP'}<span className="modal-sub">写入私有登记簿</span></h3>
+        <div className="field"><label>名字 *(kebab-case)</label>
+          <input value={f.name} onChange={set('name')} placeholder="my-app" /></div>
+        <div className="field-row">
+          <div className="field"><label>图标(emoji)</label>
+            <input value={f.icon} onChange={set('icon')} placeholder="📦" /></div>
+          <div className="field"><label>状态</label>
+            <select value={f.status} onChange={set('status')}>
+              {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select></div>
+        </div>
+        {isAgent && (
+          <div className="field-row">
+            <div className="field"><label>类型</label>
+              <select value={f.agentKind} onChange={set('agentKind')}>
+                {Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select></div>
+            <div className="field"><label>入口命令</label>
+              <input value={f.entry} onChange={set('entry')} placeholder="claude" /></div>
+          </div>
+        )}
+        <div className="field"><label>仓库</label>
+          <input value={f.repo} onChange={set('repo')} placeholder="git@github.com:you/my-app.git" /></div>
+        <div className="field"><label>访问入口(URL,选填)</label>
+          <input value={f.url} onChange={set('url')} placeholder="http://127.0.0.1:8xxx" /></div>
+        <div className="field"><label>简介</label>
+          <textarea rows="3" value={f.summary} onChange={set('summary')} placeholder="一句话说清它是干什么的" /></div>
+        {err && <div className="form-err">{err}</div>}
+        <div className="actions">
+          <button className="btn2" onClick={onClose}>取消</button>
+          <button className="btn2 primary" onClick={save}>保存</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
-  const [projects, setProjects] = useState([])
+  const [apps, setApps] = useState([])
   const [agents, setAgents] = useState([])
   const [theme, setTheme] = useState(localStorage.getItem('panel-theme') || 'light')
+  const [editing, setEditing] = useState(false)
+  const [adding, setAdding] = useState(null)   // null | 'apps' | 'agents'
 
-  useEffect(() => {
+  const reload = () =>
     Promise.all([
-      fetch('/api/projects').then((r) => r.json()),
+      fetch('/api/apps').then((r) => r.json()),
       fetch('/api/agents').then((r) => r.json()),
-    ]).then(([p, a]) => {
-      setProjects(p.data); setAgents(a.data)
-    })
-  }, [])
+    ]).then(([p, a]) => { setApps(p.data); setAgents(a.data) })
+
+  useEffect(() => { reload() }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('panel-theme', theme)
   }, [theme])
 
+  const del = async (kind, name) => {
+    await fetch(`/api/${kind}?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+    reload()
+  }
+
+  const group = (kind, title, items, renderPop, fallbackIcon) => (
+    <section>
+      <h2>{title}</h2>
+      {items.length || editing ? (
+        <div className={`launcher ${editing ? 'editing' : ''}`}>
+          {items.map((it) => (
+            <Tile key={it.name} icon={it.icon || fallbackIcon(it)} name={it.name}
+              href={it.url || (it.repo && repoUrl(it.repo))}
+              editing={editing} onDelete={() => del(kind, it.name)}>
+              {renderPop(it)}
+            </Tile>
+          ))}
+          {editing && (
+            <button className="tile add" onClick={() => setAdding(kind)}>
+              <span className="tile-icon">＋</span>
+              <span className="tile-name">新增</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="empty">还没有条目 —— 点右下角 ✏️ 进入编辑模式新增。</div>
+      )}
+    </section>
+  )
+
   return (
     <>
       <div className="aurora"><i /><i /><i /></div>
       <div className="shell">
-        <section>
-          <h2>APP</h2>
-          {projects.length ? (
-            <div className="launcher">
-              {projects.map((p) => (
-                <Tile key={p.name} icon={p.icon || '📦'} name={p.name}
-                  href={p.url || (p.repo && repoUrl(p.repo))}>
-                  <p className="pop-title">{p.name}
-                    <span className={`status ${p.status}`}><i />{STATUS[p.status] || p.status}</span></p>
-                  {p.summary && <p className="pop-body">{p.summary}</p>}
-                </Tile>
-              ))}
-            </div>
-          ) : (
-            <div className="empty">registry/ 里还没有登记项目 —— 拷贝 <code>registry/_example.md</code> 登记第一个。</div>
-          )}
-        </section>
-
-        <section>
-          <h2>Agent</h2>
-          {agents.length ? (
-            <div className="launcher">
-              {agents.map((a) => (
-                <Tile key={a.name} icon={a.icon || KIND_ICON[a.kind] || '🦾'} name={a.name}
-                  href={a.url || (a.repo && repoUrl(a.repo))}>
-                  <p className="pop-title">{a.name}
-                    <span className="status"><i />{KIND[a.kind] || a.kind || '—'}</span></p>
-                  {a.summary && <p className="pop-body">{a.summary}</p>}
-                  {a.entry && <p className="pop-entry"><code>{a.entry}</code></p>}
-                </Tile>
-              ))}
-            </div>
-          ) : (
-            <div className="empty">还没有登记 agent —— 拷贝 <code>registry/agents/_example.md</code> 登记第一个。</div>
-          )}
-        </section>
-
+        {group('apps', 'APP', apps, (p) => (
+          <>
+            <p className="pop-title">{p.name}
+              <span className={`status ${p.status}`}><i />{STATUS[p.status] || p.status}</span></p>
+            {p.summary && <p className="pop-body">{p.summary}</p>}
+          </>
+        ), () => '📦')}
+        {group('agents', 'Agent', agents, (a) => (
+          <>
+            <p className="pop-title">{a.name}
+              <span className="status"><i />{KIND[a.kind] || a.kind || '—'}</span></p>
+            {a.summary && <p className="pop-body">{a.summary}</p>}
+            {a.entry && <p className="pop-entry"><code>{a.entry}</code></p>}
+          </>
+        ), (a) => KIND_ICON[a.kind] || '🦾')}
       </div>
-      <button className="theme-btn" title="切换亮暗模式"
+      {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
+        onSaved={() => { setAdding(null); reload() }} />}
+      <button className="fab edit-btn" title="编辑模式:新增/删除"
+        onClick={() => setEditing(!editing)}>{editing ? '✓' : '✏️'}</button>
+      <button className="fab theme-btn" title="切换亮暗模式"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
         {theme === 'dark' ? '☀️' : '🌙'}
       </button>

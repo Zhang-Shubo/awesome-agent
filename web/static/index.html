@@ -166,7 +166,7 @@ if (/Chrome\//.test(navigator.userAgent)) document.documentElement.classList.add
 
 const STATUS = { active: '运行中', paused: '暂停', archived: '已归档' }
 const KIND = { interactive: '交互对话', service: '常驻服务', scheduled: '定时任务' }
-let projects = [], agents = [], cur = 'all'
+let apps = [], agents = [], cur = 'all'
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 const repoUrl = r => { const m = r.match(/^git@([^:]+):(.+?)(\.git)?$/); return m ? `https://${m[1]}/${m[2]}` : r }
@@ -180,7 +180,7 @@ function metaLine(p) {
 }
 
 function renderProjects() {
-  const list = cur === 'all' ? projects : projects.filter(p => p.status === cur)
+  const list = cur === 'all' ? apps : apps.filter(p => p.status === cur)
   document.getElementById('p-grid').innerHTML = list.map(p => `
     <div class="card glass">
       <div class="top"><h3>${esc(p.name)}</h3>
@@ -189,9 +189,9 @@ function renderProjects() {
       ${metaLine(p)}
     </div>`).join('')
   document.getElementById('p-empty').hidden = list.length > 0
-  document.getElementById('p-count').textContent = projects.length || ''
-  const counts = { all: projects.length }
-  for (const p of projects) counts[p.status] = (counts[p.status] || 0) + 1
+  document.getElementById('p-count').textContent = apps.length || ''
+  const counts = { all: apps.length }
+  for (const p of apps) counts[p.status] = (counts[p.status] || 0) + 1
   document.getElementById('p-filters').innerHTML =
     [['all','全部'],['active','运行中'],['paused','暂停'],['archived','已归档']]
       .filter(([k]) => k === 'all' || counts[k])
@@ -230,11 +230,11 @@ function initBgPicker(cfgWall) {
 }
 
 Promise.all([
-  fetch('/api/projects').then(r => r.json()),
+  fetch('/api/apps').then(r => r.json()),
   fetch('/api/agents').then(r => r.json()),
   fetch('/api/config').then(r => r.json()),
 ]).then(([p, a, cfg]) => {
-  projects = p.data; agents = a.data
+  apps = p.data; agents = a.data
   renderProjects(); renderAgents()
   document.getElementById('asof').textContent = `数据截至 ${new Date(p.asOf).toLocaleString()}`
   if (cfg.data.DOMAIN) document.getElementById('domain').textContent = cfg.data.DOMAIN

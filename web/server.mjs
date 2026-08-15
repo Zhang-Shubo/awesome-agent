@@ -46,6 +46,7 @@ function parseEntry(dir, file) {
     kind: meta.kind || '',
     entry: meta.entry || '',
     icon: meta.icon || '',
+    hidden: meta.hidden === 'true',
     summary: body.replace(/\s+/g, ' ').slice(0, 300),
     url: link ? link[0].replace(/[),.;]$/, '') : '',
   }
@@ -71,25 +72,72 @@ const PRIVATE_REGISTRY = expand(readEnv('REGISTRY_DIR')) || (AGENT_ROOT && path.
 function mergeEntries(dirs) {
   const map = new Map()
   for (const dir of dirs.filter(Boolean)) for (const e of listEntries(dir)) map.set(e.name, e)
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  // hidden 墓碑:私有条目可把同名公共条目从面板隐藏(不动公共库)
+  return [...map.values()].filter((e) => !e.hidden).sort((a, b) => a.name.localeCompare(b.name))
 }
-const projects = () => mergeEntries([REGISTRY, PRIVATE_REGISTRY])
+const apps = () => mergeEntries([REGISTRY, PRIVATE_REGISTRY])
 const agents = () => mergeEntries([
   path.join(REGISTRY, 'agents'),
   PRIVATE_REGISTRY && path.join(PRIVATE_REGISTRY, 'agents'),
 ])
 
+// 登记文件生成(写入私有登记簿用)
+function entryMd(b) {
+  const lines = ['---', `name: ${b.name}`]
+  if (b.icon) lines.push(`icon: ${b.icon}`)
+  if (b.repo) lines.push(`repo: ${b.repo}`)
+  lines.push(`status: ${b.status || 'active'}`)
+  if (b.runsOn) lines.push(`runs-on: ${b.runsOn}`)
+  if (b.kind) lines.push(`kind: ${b.kind}`)
+  if (b.entry) lines.push(`entry: ${b.entry}`)
+  lines.push('---', '', (b.summary || '').trim())
+  if (b.url) lines.push('', `入口:${b.url}`)
+  return lines.join('\n') + '\n'
+}
+
+const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/
+const readBody = (req) => new Promise((resolve) => {
+  let s = ''
+  req.on('data', (c) => { s += c })
+  req.on('end', () => resolve(s))
+})
+
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
 
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
-  if (url.pathname === '/api/projects') {
-    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-    return res.end(JSON.stringify({ ok: true, data: projects(), asOf: new Date().toISOString() }))
+  const send = (code, data) => {
+    res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify(data))
   }
-  if (url.pathname === '/api/agents') {
-    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-    return res.end(JSON.stringify({ ok: true, data: agents(), asOf: new Date().toISOString() }))
+  if (url.pathname === '/api/apps' || url.pathname === '/api/agents') {
+    const isAgents = url.pathname === '/api/agents'
+    if (req.method === 'GET') {
+      return send(200, { ok: true, data: isAgents ? agents() : apps(), asOf: new Date().toISOString() })
+    }
+    // 写操作只落私有登记簿,公共库永远不被 web 改动
+    if (!PRIVATE_REGISTRY) return send(400, { ok: false, error: '未配置私有登记簿(config.env 的 AGENT_ROOT 或 REGISTRY_DIR)' })
+    const dir = isAgents ? path.join(PRIVATE_REGISTRY, 'agents') : PRIVATE_REGISTRY
+    if (req.method === 'POST') {
+      let b
+      try { b = JSON.parse(await readBody(req)) } catch { return send(400, { ok: false, error: 'JSON 解析失败' }) }
+      if (!NAME_RE.test(b.name || '')) return send(400, { ok: false, error: 'name 需为小写字母/数字/横线(kebab-case)' })
+      fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(path.join(dir, `${b.name}.md`), entryMd(b))
+      return send(200, { ok: true })
+    }
+    if (req.method === 'DELETE') {
+      const name = url.searchParams.get('name') || ''
+      if (!NAME_RE.test(name)) return send(400, { ok: false, error: 'name 非法' })
+      fs.mkdirSync(dir, { recursive: true })
+      const file = path.join(dir, `${name}.md`)
+      if (fs.existsSync(file)) fs.rmSync(file)
+      // 若删的是公共条目,写 hidden 墓碑把它从面板隐藏(公共库文件不动)
+      if ((isAgents ? agents() : apps()).some((e) => e.name === name)) {
+        fs.writeFileSync(file, `---\nname: ${name}\nhidden: true\n---\n`)
+      }
+      return send(200, { ok: true })
+    }
   }
   if (url.pathname === '/api/config') {
     const cfg = Object.fromEntries(SAFE_KEYS.map(k => [k, readEnv(k) || '']).filter(([, v]) => v))
