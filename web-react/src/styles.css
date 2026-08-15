@@ -92,7 +92,7 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .empty code { font-size: 13px; }
 
-/* 右下角悬浮按钮:亮暗切换 + 编辑模式 */
+/* 右下角悬浮按钮:亮暗切换(编辑模式走手势:空白长按进入/单击退出) */
 .fab {
   position: fixed; right: 24px; z-index: 30;
   width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--glass-border);
@@ -102,7 +102,6 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
   color: var(--text);
 }
 .theme-btn { bottom: 24px; }
-.edit-btn { bottom: 82px; }
 
 /* 编辑模式:删除角标 + 新增瓷贴 */
 .tile-del {

@@ -177,7 +177,7 @@ export default function App() {
           )}
         </div>
       ) : (
-        <div className="empty">还没有条目 —— 点右下角 ✏️ 进入编辑模式新增。</div>
+        <div className="empty">还没有条目 —— 长按页面空白处进入编辑模式新增。</div>
       )}
     </section>
   )
@@ -204,8 +204,6 @@ export default function App() {
       </div>
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}
-      <button className="fab edit-btn" title="编辑模式:新增/删除"
-        onClick={() => setEditing(!editing)}>{editing ? '✓' : '✏️'}</button>
       <button className="fab theme-btn" title="切换亮暗模式"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
         {theme === 'dark' ? '☀️' : '🌙'}
