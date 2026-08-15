@@ -92,16 +92,66 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .empty code { font-size: 13px; }
 
-/* 右下角悬浮按钮:亮暗切换(编辑模式走手势:空白长按进入/单击退出) */
+/* 悬浮按钮:右下 AI 对话,左下亮暗切换(编辑模式走手势:空白长按进入/单击退出) */
 .fab {
-  position: fixed; right: 24px; z-index: 30;
+  position: fixed; z-index: 30;
   width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--glass-border);
   background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow);
   font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   color: var(--text);
 }
-.theme-btn { bottom: 24px; }
+.chat-btn { right: 24px; bottom: 24px; }
+.theme-btn { left: 24px; bottom: 24px; }
+
+/* AI 对话侧边栏:玻璃拟态右抽屉,常驻挂载靠 transform 收放 */
+.chat {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 40;
+  width: min(400px, 94vw); display: flex; flex-direction: column;
+  background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-left: 1px solid var(--glass-border); box-shadow: var(--shadow);
+  transform: translateX(105%); transition: transform 0.28s ease;
+}
+.chat.open { transform: none; }
+.chat-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--glass-border);
+}
+.chat-head b { font-size: 15px; }
+.chat-sub { font-size: 12px; font-weight: 400; color: var(--muted); margin-right: auto; }
+.chat-hbtn {
+  width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--glass-border);
+  background: var(--glass); color: var(--muted); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.chat-hbtn:hover { color: var(--text); }
+.chat-body { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.chat-hello { color: var(--muted); font-size: 13px; font-weight: 400; text-align: center; margin-top: 28px; line-height: 1.9; }
+.msg {
+  max-width: 88%; padding: 8px 12px; border-radius: 14px;
+  font-size: 13px; font-weight: 400; line-height: 1.65;
+  white-space: pre-wrap; word-break: break-word;
+}
+.msg.user { align-self: flex-end; background: rgba(99, 102, 241, 0.14); border: 1px solid rgba(99, 102, 241, 0.2); border-bottom-right-radius: 4px; }
+.msg.ai { align-self: flex-start; background: var(--glass); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
+.msg-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.msg-tools i {
+  font-style: normal; font-size: 11px; color: var(--muted);
+  border: 1px solid var(--glass-border); border-radius: 999px; padding: 1px 8px;
+}
+.chat-input { display: flex; align-items: flex-end; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--glass-border); }
+.chat-input textarea {
+  flex: 1; resize: none; max-height: 120px; padding: 9px 12px;
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  background: var(--glass); color: var(--text);
+  font: 400 13px/1.5 inherit; font-family: inherit; outline: none;
+}
+.chat-send {
+  width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+  background: #6366f1; color: #fff; font-size: 16px; flex-shrink: 0;
+}
+.chat-send:disabled { opacity: 0.4; cursor: default; }
 
 /* 桌宠(petdex.dev 的 boba,MIT):底部游走,逐帧雪碧图 */
 .pet { position: fixed; bottom: 0; left: 0; z-index: 25; cursor: pointer; width: 70px; height: 76px; overflow: hidden; }

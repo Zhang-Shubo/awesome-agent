@@ -4,7 +4,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const execFileP = promisify(execFile)
@@ -167,6 +167,32 @@ http.createServer(async (req, res) => {
     const cfg = Object.fromEntries(SAFE_KEYS.map(k => [k, readEnv(k) || '']).filter(([, v]) => v))
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     return res.end(JSON.stringify({ ok: true, data: cfg }))
+  }
+  // AI 对话:流式透传本机 claude CLI 的 stream-json(NDJSON),认证复用 CLI 登录态。
+  // 多轮靠 --resume <sessionId>;工作目录默认 $AGENT_ROOT。headless 下写类工具默认被拒,
+  // 需要更多权限可在 config.env 设 CHAT_ARGS(如 --permission-mode acceptEdits)。
+  if (url.pathname === '/api/chat' && req.method === 'POST') {
+    let body
+    try { body = JSON.parse(await readBody(req)) } catch { return send(400, { ok: false, error: '请求体不是 JSON' }) }
+    const message = String(body.message || '').trim()
+    if (!message) return send(400, { ok: false, error: '空消息' })
+    const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--include-partial-messages']
+    if (body.sessionId) args.push('--resume', String(body.sessionId))
+    args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
+    const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT
+    const child = spawn('claude', args, { cwd, env: process.env })
+    res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-cache' })
+    child.stdout.pipe(res, { end: false })
+    let errBuf = ''
+    child.stderr.on('data', (c) => { errBuf += c })
+    const fail = (msg) => { if (!res.writableEnded) { res.write(JSON.stringify({ type: 'error', error: msg }) + '\n'); res.end() } }
+    child.on('error', (e) => fail(`claude 启动失败:${e.message}`))
+    child.on('close', (code) => {
+      if (code !== 0) return fail((errBuf.trim() || `claude 退出码 ${code}`).slice(-800))
+      if (!res.writableEnded) res.end()
+    })
+    req.on('close', () => child.kill('SIGTERM'))
+    return
   }
   // 私有登记簿可自带图标文件:REGISTRY_DIR/icons/ 映射到 /icons/,条目里写 icon: /icons/xxx.svg 即可
   if (url.pathname.startsWith('/icons/') && PRIVATE_REGISTRY) {

@@ -37,6 +37,98 @@ function Tile({ icon, fallback, name, href, editing, onDelete, children }) {
   )
 }
 
+// AI 对话侧边栏:后端 /api/chat 透传 claude CLI 的 stream-json,前端解析 NDJSON 流式渲染。
+// 常驻挂载(关闭仅平移隐藏),对话与 sessionId 得以保留;多轮靠 --resume。
+function Chat({ open, onClose }) {
+  const [msgs, setMsgs] = useState([])   // { role: 'user'|'ai', text, tools: [] }
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const sidRef = useRef(null)
+  const bodyRef = useRef(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => { bodyRef.current?.scrollTo(0, 1e9) }, [msgs])
+  useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+
+  const send = async () => {
+    const text = input.trim()
+    if (!text || busy) return
+    setInput(''); setBusy(true)
+    setMsgs((m) => [...m, { role: 'user', text }, { role: 'ai', text: '', tools: [] }])
+    const upd = (fn) => setMsgs((m) => { const c = m.slice(); c[c.length - 1] = fn(c[c.length - 1]); return c })
+    // acc = 本轮已定稿的助手文本(工具调用会分多条 assistant 消息),streamed = 当前消息的增量
+    let acc = '', streamed = ''
+    try {
+      const r = await fetch('/api/chat', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: text, sessionId: sidRef.current }),
+      })
+      const reader = r.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const lines = buf.split('\n'); buf = lines.pop()
+        for (const line of lines) {
+          if (!line.trim()) continue
+          let ev; try { ev = JSON.parse(line) } catch { continue }
+          if (ev.type === 'system' && ev.subtype === 'init') sidRef.current = ev.session_id
+          else if (ev.type === 'stream_event' && ev.event?.delta?.type === 'text_delta') {
+            streamed += ev.event.delta.text
+            upd((x) => ({ ...x, text: acc + streamed }))
+          } else if (ev.type === 'assistant') {
+            const blocks = ev.message?.content || []
+            const txt = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('')
+            if (txt) { acc += (acc ? '\n' : '') + txt; streamed = '' ; upd((x) => ({ ...x, text: acc })) }
+            for (const b of blocks) if (b.type === 'tool_use') upd((x) => ({ ...x, tools: [...x.tools, b.name] }))
+          } else if (ev.type === 'result') {
+            if (ev.session_id) sidRef.current = ev.session_id
+            if (ev.is_error && !acc) upd((x) => ({ ...x, text: String(ev.result || ev.subtype || '出错了') }))
+          } else if (ev.type === 'error') {
+            upd((x) => ({ ...x, text: (acc ? acc + '\n' : '') + `⚠️ ${ev.error}` }))
+          }
+        }
+      }
+    } catch (e) {
+      upd((x) => ({ ...x, text: (x.text || '') + `\n⚠️ ${e.message || e}` }))
+    }
+    upd((x) => (x.text ? x : { ...x, text: '(无输出)' }))
+    setBusy(false)
+  }
+
+  const reset = () => { setMsgs([]); sidRef.current = null; inputRef.current?.focus() }
+
+  return (
+    <aside className={`chat ${open ? 'open' : ''}`}>
+      <div className="chat-head">
+        <b>AI 对话</b>
+        <span className="chat-sub">{busy ? '思考中…' : (sidRef.current ? '会话中' : '新会话')}</span>
+        <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
+        <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
+      </div>
+      <div className="chat-body" ref={bodyRef}>
+        {msgs.length === 0 && <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>}
+        {msgs.map((m, i) => (
+          <div key={i} className={`msg ${m.role}`}>
+            {m.tools?.length > 0 && (
+              <span className="msg-tools">{[...new Set(m.tools)].map((t) => <i key={t}>🔧 {t}</i>)}</span>
+            )}
+            {m.text || (busy && i === msgs.length - 1 ? '…' : '')}
+          </div>
+        ))}
+      </div>
+      <div className="chat-input">
+        <textarea ref={inputRef} rows="1" value={input} placeholder="输入消息,Enter 发送"
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} />
+        <button className="chat-send" disabled={busy || !input.trim()} onClick={send}>↑</button>
+      </div>
+    </aside>
+  )
+}
+
 function AddForm({ kind, onClose, onSaved }) {
   const isAgent = kind === 'agents'
   const [f, setF] = useState({ link: '', name: '', icon: '', repo: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
@@ -113,6 +205,7 @@ export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('panel-theme') || 'light')
   const [editing, setEditing] = useState(false)
   const [adding, setAdding] = useState(null)   // null | 'apps' | 'agents'
+  const [chatOpen, setChatOpen] = useState(false)
 
   const reload = () =>
     Promise.all([
@@ -134,7 +227,7 @@ export default function App() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
-      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, a, button, input, select, textarea')
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
       if (editingRef.current || !blank(e)) return
@@ -213,6 +306,8 @@ export default function App() {
       <Pet />
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}
+      <Chat open={chatOpen} onClose={() => setChatOpen(false)} />
+      <button className="fab chat-btn" title="AI 对话" onClick={() => setChatOpen((v) => !v)}>✨</button>
       <button className="fab theme-btn" title="切换亮暗模式"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
         {theme === 'dark' ? '☀️' : '🌙'}
