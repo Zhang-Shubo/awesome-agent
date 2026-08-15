@@ -1,121 +1,84 @@
-/* 版式:Figma 网站线框模板(Landing page,xL83wwahR8HqROu6HPfH8b)。
-   表皮:glassmorphism —— 半透明面板 rgba+blur(20)saturate(180%)+1px 细描边+柔影,
-   背景低饱和渐变光斑;面板 alpha ≥.55 保正文可读(WCAG AA)。 */
+/* 启动台式面板 · glassmorphism 明亮版:
+   半透明玻璃 rgba + blur(20px) saturate(180%) + 1px 细描边 + 柔影,低饱和光斑背景。
+   详情在悬浮图标时以玻璃浮层显示。 */
 :root {
   --bg: #f6f7fb;
   --text: #0e1116;
-  --text-75: rgba(14, 17, 22, 0.75);
   --muted: rgba(14, 17, 22, 0.55);
   --glass: rgba(255, 255, 255, 0.55);
-  --glass-strong: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.78);
   --glass-border: rgba(255, 255, 255, 0.65);
   --hairline: rgba(14, 17, 22, 0.08);
   --shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
   --green: #34c759; --orange: #ff9500;
-  --btn-bg: #0e1116; --btn-fg: #ffffff;
   --blob-a: #c7d2fe; --blob-b: #fbcfe8; --blob-c: #a5f3fc;
-  --sp-m: 48px; --sp-sm: 32px;
 }
-/* 固定明亮版:不跟随系统深色模式 */
 * { box-sizing: border-box; margin: 0; }
 body {
   background: var(--bg); color: var(--text);
-  font: 500 20px/1.5 Inter, -apple-system, "PingFang SC", system-ui, sans-serif;
+  font: 500 16px/1.5 Inter, -apple-system, "PingFang SC", system-ui, sans-serif;
   min-height: 100vh; -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration: none; }
 
-/* 背景光斑:低饱和、大模糊,给磨砂层"可透"的内容 */
 .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; filter: blur(70px) saturate(120%); }
 .aurora i { position: absolute; border-radius: 50%; opacity: 0.55; }
 .aurora i:nth-child(1) { width: 46vw; height: 46vw; left: -8vw; top: -18vh; background: var(--blob-a); }
 .aurora i:nth-child(2) { width: 38vw; height: 38vw; right: -6vw; top: 10vh; background: var(--blob-b); }
 .aurora i:nth-child(3) { width: 42vw; height: 42vw; left: 24vw; bottom: -22vh; background: var(--blob-c); }
 
-.shell { max-width: 1280px; margin: 0 auto; padding: 0 clamp(24px, 5.5vw, 80px); }
+.shell { max-width: 1080px; margin: 0 auto; padding: clamp(40px, 8vh, 80px) clamp(24px, 5vw, 64px) 48px; }
 
-/* 磨砂导航:通栏吸顶,半透明白 + blur(20)saturate(180%) + 底部发丝线 */
-.nav {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid var(--hairline);
-}
-.nav-inner { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; padding-bottom: 16px; }
-.site { font-size: 20px; }
-.nav-items { display: flex; align-items: center; gap: var(--sp-m); }
-.nav-items a:not(.btn):hover { color: var(--text-75); }
-.btn {
-  background: var(--btn-bg); color: var(--btn-fg); border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  font-size: 16px; padding: 12px 22px; display: inline-flex; align-items: center;
-}
-.btn:hover { opacity: 0.85; }
+section + section { margin-top: 56px; }
+h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 24px; }
 
-/* Page title:64 Bold,副标题 24 Regular 75% */
-.hero { padding: clamp(48px, 7vh, 88px) 0 32px; }
-.hero h1 { font-size: clamp(40px, 4.5vw, 64px); font-weight: 700; letter-spacing: -0.02em; line-height: normal; }
-.hero .sub { font-size: clamp(18px, 1.7vw, 24px); font-weight: 400; color: var(--text-75); margin-top: 24px; max-width: 844px; }
-
-section { padding-top: var(--sp-m); }
-.section-head { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; margin-bottom: var(--sp-m); }
-.section-head h2 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; letter-spacing: -0.02em; }
-.filters { display: flex; gap: 24px; font-size: 16px; }
-.filters .chip { color: var(--muted); cursor: pointer; user-select: none; }
-.filters .chip.on { color: var(--text); }
-
-/* 玻璃面板公共皮肤 */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 40px 35px; }
-.card { display: flex; flex-direction: column; gap: 24px; }
-.thumb {
-  aspect-ratio: 404 / 300; border-radius: 16px;
+/* 启动台:小玻璃图标 + 名字,悬浮弹详情 */
+.launcher { display: grid; grid-template-columns: repeat(auto-fill, 96px); gap: 28px 20px; }
+.tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+.tile-icon {
+  width: 64px; height: 64px; border-radius: 16px;
   background: var(--glass);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--glass-border); box-shadow: var(--shadow);
-  display: flex; align-items: center; justify-content: center; font-size: 96px;
+  display: flex; align-items: center; justify-content: center; font-size: 32px;
   transition: transform 0.15s ease;
 }
-.card:hover .thumb { transform: translateY(-3px); }
-.copy { display: flex; flex-direction: column; gap: 4px; }
-.card-title { font-size: 24px; font-weight: 500; }
-.card-body { font-size: 16px; font-weight: 400; color: var(--muted);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.status { font-size: 16px; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.status i { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
-.status.active i { background: var(--green); }
-.status.paused i { background: var(--orange); }
+.tile:hover .tile-icon { transform: translateY(-3px) scale(1.05); }
+.tile-name {
+  font-size: 13px; font-weight: 500; text-align: center; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 
-/* 引言卡 → 玻璃卡:正文层 alpha 提到 .62 */
-.quote {
+/* 悬浮详情:玻璃浮层,alpha 提高保正文可读 */
+.pop {
+  position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%) translateY(4px);
+  width: 300px; z-index: 20; pointer-events: none; opacity: 0;
   background: var(--glass-strong);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border); border-radius: 16px; box-shadow: var(--shadow);
-  padding: var(--sp-sm); display: flex; flex-direction: column; gap: var(--sp-m);
-  justify-content: space-between; transition: transform 0.15s ease;
+  border: 1px solid var(--glass-border); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 14px 16px; text-align: left;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.quote:hover { transform: translateY(-3px); }
-.quote-text { font-size: 24px; font-weight: 500; line-height: 1.5; }
-.avatar-row { display: flex; align-items: center; gap: 16px; }
-.avatar {
-  width: 45px; height: 45px; border-radius: 50%; background: var(--glass);
-  border: 1px solid var(--glass-border); flex: none;
-  display: flex; align-items: center; justify-content: center; font-size: 24px;
-}
-.avatar-row .who { display: flex; flex-direction: column; gap: 2px; font-size: 16px; min-width: 0; }
-.who .desc { color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.who .desc code { font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
+.tile:hover .pop { opacity: 1; transform: translateX(-50%) translateY(0); }
+.launcher .tile:first-child .pop { left: 0; transform: translateY(4px); }
+.launcher .tile:first-child:hover .pop { transform: translateY(0); }
+.pop-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pop-body { font-size: 13px; font-weight: 400; color: var(--muted); margin-top: 6px; }
+.pop-entry { margin-top: 8px; }
+.pop-entry code { font: 12px/1.6 ui-monospace, "SF Mono", Menlo, monospace; }
+.status { font-size: 12px; font-weight: 500; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.active i { background: var(--green); }
+.status.paused i { background: var(--orange); }
 
 .empty {
   background: var(--glass); border: 1px dashed var(--glass-border); border-radius: 16px;
   -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
-  padding: 48px 32px; text-align: center; color: var(--muted); font-size: 16px; font-weight: 400;
+  padding: 40px 32px; text-align: center; color: var(--muted); font-size: 14px; font-weight: 400;
 }
-.empty code { font-size: 14px; }
+.empty code { font-size: 13px; }
 
-footer { margin-top: 96px; border-top: 1px solid var(--hairline); padding: 48px 0 64px;
-  display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-footer .site-foot { font-size: 20px; }
-footer .meta { font-size: 16px; color: var(--muted); font-weight: 400; }
+footer { margin-top: 72px; border-top: 1px solid var(--hairline); padding-top: 20px; }
+footer .meta { font-size: 12px; color: var(--muted); font-weight: 400; }
