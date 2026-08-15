@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // 启动台式面板:APP 与 Agent 两组小图标,详情悬浮显示。
 // 编辑模式:新增/删除,写操作全部落私有登记簿(见 docs/07),公共库不被 web 改动。
@@ -123,13 +123,17 @@ export default function App() {
     localStorage.setItem('panel-theme', theme)
   }, [theme])
 
-  // 仿 iOS 主屏:空白处长按(550ms,位移<8px)进入编辑,编辑中单击空白处退出
+  // 仿 iOS 主屏:空白处长按(550ms,位移<8px)进入编辑,编辑中单击空白处退出。
+  // 监听器只挂一次,editing 经 ref 读——若依赖 [editing] 重挂,fired 标志会被重置,
+  // 长按松开的 click 就被误判成"单击空白"而立即退出编辑。
+  const editingRef = useRef(editing)
+  useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
       !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
-      if (editing || !blank(e)) return
+      if (editingRef.current || !blank(e)) return
       sx = e.clientX; sy = e.clientY
       timer = setTimeout(() => { fired = true; setEditing(true) }, 550)
     }
@@ -137,7 +141,7 @@ export default function App() {
     const up = () => { clearTimeout(timer); setTimeout(() => { fired = false }, 0) }
     const click = (e) => {
       if (fired) return                    // 长按进入编辑的那次抬起,不算退出
-      if (editing && blank(e)) setEditing(false)
+      if (editingRef.current && blank(e)) setEditing(false)
     }
     document.addEventListener('mousedown', down)
     document.addEventListener('mousemove', move)
@@ -150,7 +154,7 @@ export default function App() {
       document.removeEventListener('mouseup', up)
       document.removeEventListener('click', click)
     }
-  }, [editing])
+  }, [])
 
   const del = async (kind, name) => {
     await fetch(`/api/${kind}?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
