@@ -123,6 +123,35 @@ export default function App() {
     localStorage.setItem('panel-theme', theme)
   }, [theme])
 
+  // 仿 iOS 主屏:空白处长按(550ms,位移<8px)进入编辑,编辑中单击空白处退出
+  useEffect(() => {
+    const blank = (e) => e.button === 0 &&
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, a, button, input, select, textarea')
+    let timer, sx, sy, fired = false
+    const down = (e) => {
+      if (editing || !blank(e)) return
+      sx = e.clientX; sy = e.clientY
+      timer = setTimeout(() => { fired = true; setEditing(true) }, 550)
+    }
+    const move = (e) => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 8) clearTimeout(timer) }
+    const up = () => { clearTimeout(timer); setTimeout(() => { fired = false }, 0) }
+    const click = (e) => {
+      if (fired) return                    // 长按进入编辑的那次抬起,不算退出
+      if (editing && blank(e)) setEditing(false)
+    }
+    document.addEventListener('mousedown', down)
+    document.addEventListener('mousemove', move)
+    document.addEventListener('mouseup', up)
+    document.addEventListener('click', click)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', down)
+      document.removeEventListener('mousemove', move)
+      document.removeEventListener('mouseup', up)
+      document.removeEventListener('click', click)
+    }
+  }, [editing])
+
   const del = async (kind, name) => {
     await fetch(`/api/${kind}?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
     reload()
