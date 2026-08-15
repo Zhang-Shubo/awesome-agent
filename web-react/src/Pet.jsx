@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-// 桌宠:petdex.dev 的 boba(MIT,Codex sprite v2 格式,8x11 网格)。
+// 桌宠:petdex.dev 的噜噜 lulu-capybara-2(MIT,Codex sprite 格式,v1 8x9 / v2 8x11 行含义相同)。
 // 雪碧图已缩到半尺寸,每格 96x104;换宠物 = 替换 public/pet/spritesheet.webp(同格式即可)。
 const CW = 96, CH = 104
 const STATES = {
@@ -83,7 +83,7 @@ export default function Pet() {
 
   if (!ok) return null
   return (
-    <div className="pet" ref={box} title="boba · 点我">
+    <div className="pet" ref={box} title="噜噜 · 点我">
       <i ref={spr} />
     </div>
   )
