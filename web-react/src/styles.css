@@ -1,142 +1,93 @@
-/* iOS 16 UI Kit(Figma fg3IEbji6tX2Zp9ZWFLXGz)实测值:
-   TableView 1033:8170 / SegmentedPicker 38:2572 / TopNavigation 1309:10419。
-   次级文字/分隔线是同一基色带透明度(rgba),不是独立灰色。 */
+/* Figma 网站线框模板(xL83wwahR8HqROu6HPfH8b · Landing page)实测值:
+   Navigation 2:1487 / Page title 2:1549 / Card 2:1498 / Customer Quote 2:1419。
+   Inter,黑白灰三色:#000 / rgba(0,0,0,.75) / #828282,描边 #E6E6E6。纯浅色设计。 */
 :root {
-  --bg: #f2f2f7; --card: #ffffff;
   --text: #000000;
-  --secondary: rgba(60, 60, 67, 0.6);
-  --tertiary: rgba(60, 60, 67, 0.3);
-  --separator: rgba(60, 60, 67, 0.36);
-  --blue: #007aff; --green: #34c759; --orange: #ff9500; --red: #ff3b30;
-  --blue-tint: rgba(0, 122, 255, 0.15);
-  --seg-bg: rgba(118, 118, 128, 0.12);
-  --seg-on: #ffffff;
-  --nav-bg: rgba(249, 249, 249, 0.94);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000; --card: #1c1c1e;
-    --text: #ffffff;
-    --secondary: rgba(235, 235, 245, 0.6);
-    --tertiary: rgba(235, 235, 245, 0.3);
-    --separator: rgba(84, 84, 88, 0.65);
-    --blue: #0a84ff; --orange: #ff9f0a; --red: #ff453a;
-    --blue-tint: rgba(10, 132, 255, 0.18);
-    --seg-bg: rgba(118, 118, 128, 0.24);
-    --seg-on: #636366;
-    --nav-bg: rgba(29, 29, 31, 0.94);
-  }
+  --text-75: rgba(0, 0, 0, 0.75);
+  --muted: #828282;
+  --border: #e6e6e6;
+  --thumb: #f2f2f2;
+  --green: #34c759; --orange: #ff9500;
+  --sp-m: 48px; --sp-sm: 32px;
+  --btn-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 * { box-sizing: border-box; margin: 0; }
 body {
-  background: var(--bg); color: var(--text);
-  /* Body/Regular 17/22, letterSpacing -0.408 */
-  font: 17px/1.3 -apple-system, "SF Pro Text", system-ui, "PingFang SC", sans-serif;
-  letter-spacing: -0.408px; min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+  background: #ffffff; color: var(--text);
+  font: 500 20px/1.5 Inter, -apple-system, "PingFang SC", system-ui, sans-serif;
+  min-height: 100vh; -webkit-font-smoothing: antialiased;
 }
+a { color: inherit; text-decoration: none; }
 
-.wrap { max-width: 720px; margin: 0 auto; padding: 0 16px 48px; }
+/* 1440 设计稿两侧留白 80,内容 1280 */
+.shell { max-width: 1280px; margin: 0 auto; padding: 0 clamp(24px, 5.5vw, 80px); }
 
-/* TopNavigation:rgba(249,249,249,.94) + blur(10),底线 0.5 分隔色;内容高 42,Body/Bold 居中 */
-.nav {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--nav-bg);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  border-bottom: 0.5px solid var(--separator);
-  margin: 0 -16px; padding: 0 16px;
-  height: 42px; display: flex; align-items: center; justify-content: center;
+/* Navigation:站名 20 Medium 左,链接 20 Medium 间距 48 + 黑按钮右,总高 164 */
+.nav { display: flex; align-items: center; justify-content: space-between; padding: 56px 0; }
+.site { font-size: 20px; }
+.nav-items { display: flex; align-items: center; gap: var(--sp-m); }
+.nav-items a:not(.btn):hover { color: var(--text-75); }
+.btn {
+  background: #000; color: #fff; border-radius: 8px; box-shadow: var(--btn-shadow);
+  font-size: 16px; padding: 14px 24px; display: inline-flex; align-items: center;
 }
-.nav h1 { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.408px; }
-/* LargeTitle/Bold 34/41 +0.374,左缩进 14、底部 15(取自 1309:10422 Extra) */
-.large-title {
-  font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.374px;
-  margin: 8px 0 0 14px; padding-bottom: 15px;
-}
-.domain { color: var(--secondary); font-size: 15px; letter-spacing: -0.24px; font-weight: 400; margin-left: 14px; }
+.btn:hover { background: #222; }
 
-/* 分组列表 section 标题/脚注:Caption1 12/16 次级色,左内缩 16 */
-.section-header {
-  color: var(--secondary); font-size: 12px; line-height: 16px; letter-spacing: 0;
-  text-transform: uppercase; margin: 28px 16px 8px;
-}
-.section-footer { color: var(--secondary); font-size: 12px; line-height: 16px; letter-spacing: 0; margin: 8px 16px 0; }
+/* Page title:64 Bold -1.28,副标题 24 Regular 75% 黑,间距 24 */
+.hero { padding: 24px 0 32px; }
+.hero h1 { font-size: clamp(40px, 4.5vw, 64px); font-weight: 700; letter-spacing: -0.02em; line-height: normal; }
+.hero .sub { font-size: clamp(18px, 1.7vw, 24px); font-weight: 400; color: var(--text-75); margin-top: 24px; max-width: 844px; }
 
-/* SegmentedPicker:容器 h32 r8 p2 底 rgba(118,118,128,.12);
-   选中片 r7 白底 + 0.5 描边 rgba(0,0,0,.04) + 双层投影;未选中片间有细分隔条 */
-.seg { display: flex; background: var(--seg-bg); border-radius: 8px; padding: 2px; height: 32px; margin: 0 0 14px; }
-.seg button {
-  position: relative; flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text);
-  font-family: inherit; font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: -0.08px;
-  border-radius: 7px; cursor: pointer; white-space: nowrap; padding: 0 8px;
-}
-.seg button.on {
-  background: var(--seg-on); font-weight: 600;
-  border: 0.5px solid rgba(0, 0, 0, 0.04);
-  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.12), 0 3px 0.5px rgba(0, 0, 0, 0.04);
-}
-.seg button + button::before {
-  content: ""; position: absolute; left: -0.5px; top: 21.4%; bottom: 21.4%;
-  width: 1px; border-radius: 0.5px; background: var(--separator);
-}
-.seg button.on + button::before, .seg button + button.on::before { content: none; }
-.seg .n { color: var(--secondary); font-weight: 400; margin-left: 3px; }
+/* Section heading:40 Bold,区块上下留白照稿(标题距网格 48) */
+section { padding-top: var(--sp-m); }
+.section-head { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; margin-bottom: var(--sp-m); }
+.section-head h2 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; letter-spacing: -0.02em; }
+.filters { display: flex; gap: 24px; font-size: 16px; }
+.filters .chip { color: var(--muted); cursor: pointer; user-select: none; }
+.filters .chip.on { color: var(--text); }
 
-/* 项目:主屏图标网格 —— 圆角矩形图标 + 名字 */
-.springboard { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 20px 8px; padding: 4px; }
-.app { display: flex; flex-direction: column; align-items: center; gap: 7px; text-decoration: none; color: var(--text); }
-.app-icon {
-  width: 60px; height: 60px; border-radius: 14px; /* ≈ 尺寸的 22%,近似超椭圆 */
-  background: var(--card); display: flex; align-items: center; justify-content: center;
-  font-size: 32px; box-shadow: 0 0 0 0.5px var(--separator) inset;
-  position: relative;
+/* 产品卡网格:3 列,列距 35,卡 = 圆角 8 图区 + 24 Medium 标题 + #828282 正文,纵距 24/4 */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 40px 35px; }
+.card { display: flex; flex-direction: column; gap: 24px; }
+.thumb {
+  aspect-ratio: 404 / 300; border-radius: 8px; background: var(--thumb);
+  display: flex; align-items: center; justify-content: center; font-size: 96px;
 }
-.app-icon .dot {
-  position: absolute; top: -2px; right: -2px; width: 12px; height: 12px;
-  border-radius: 50%; border: 2px solid var(--bg);
-}
-.dot.active { background: var(--green); }
-.dot.paused { background: var(--orange); }
-.dot.archived { background: var(--tertiary); }
-.app-name {
-  font-size: 12px; line-height: 16px; letter-spacing: 0; text-align: center;
-  overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical; overflow: hidden;
-}
+.card:hover .thumb { background: #ebebeb; }
+.copy { display: flex; flex-direction: column; gap: 4px; }
+.card-title { font-size: 24px; font-weight: 500; }
+.card-body { font-size: 16px; font-weight: 400; color: var(--muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.status { font-size: 16px; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.status i { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.status.active i { background: var(--green); }
+.status.paused i { background: var(--orange); }
 
-/* agent:DetailedTableView —— 卡片 r10;行 = 图标 30 r7 + 间距 8 + 内容(pt8 pb9 pr16);
-   分隔线 0.5 从内容左缘起(16+30+8=54);标题 Body 17/22,副文字 Caption1 12/16 */
-.list { background: var(--card); border-radius: 10px; overflow: hidden; }
-.row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 16px 9px; min-height: 44px;
-  color: inherit; text-decoration: none; position: relative;
+/* Customer Quote 卡:白底 #E6E6E6 描边 圆角 12 内边距 32,引文 24 Medium,头像 45 + 16 Medium */
+.quote {
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  padding: var(--sp-sm); display: flex; flex-direction: column; gap: var(--sp-m);
+  justify-content: space-between;
 }
-a.row:active { background: var(--seg-bg); }
-.row + .row::before {
-  content: ""; position: absolute; top: 0; left: 54px; right: 0;
-  border-top: 0.5px solid var(--separator);
+.quote:hover { border-color: #cfcfcf; }
+.quote-text { font-size: 24px; font-weight: 500; line-height: 1.5; }
+.avatar-row { display: flex; align-items: center; gap: 16px; }
+.avatar {
+  width: 45px; height: 45px; border-radius: 50%; background: var(--thumb); flex: none;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
 }
-.row-icon {
-  width: 30px; height: 30px; border-radius: 7px; flex: none;
-  background: var(--blue-tint); display: flex; align-items: center; justify-content: center;
-  font-size: 17px;
-}
-.row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.row-title { font-size: 17px; line-height: 22px; letter-spacing: -0.408px; }
-.row-sub { color: var(--secondary); font-size: 12px; line-height: 16px; letter-spacing: 0; }
-.row-entry {
-  color: var(--secondary); font: 12px/16px ui-monospace, "SF Mono", Menlo, monospace;
-  letter-spacing: 0; overflow-x: auto; white-space: nowrap;
-}
-.row-value { color: var(--secondary); font-size: 17px; line-height: 22px; letter-spacing: -0.408px; flex: none; }
-.chevron { color: var(--tertiary); font-size: 17px; font-weight: 600; flex: none; margin-left: -2px; }
+.avatar-row .who { display: flex; flex-direction: column; gap: 2px; font-size: 16px; min-width: 0; }
+.who .desc { color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .desc code { font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
 
 .empty {
-  background: var(--card); border-radius: 10px; padding: 28px 16px; text-align: center;
-  color: var(--secondary); font-size: 15px; letter-spacing: -0.24px;
+  border: 1px dashed var(--border); border-radius: 12px; padding: 48px 32px;
+  text-align: center; color: var(--muted); font-size: 16px; font-weight: 400;
 }
-code { font: 0.85em ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0; }
+.empty code { font-size: 14px; }
 
-footer { margin: 36px 16px 0; color: var(--tertiary); font-size: 12px; line-height: 16px; letter-spacing: 0; }
+/* Footer:1px #E6E6E6 分隔线起头,站名 + 说明 */
+footer { margin-top: 96px; border-top: 1px solid var(--border); padding: 48px 0 64px;
+  display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+footer .site-foot { font-size: 20px; }
+footer .meta { font-size: 16px; color: var(--muted); font-weight: 400; }
