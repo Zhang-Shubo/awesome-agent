@@ -168,6 +168,15 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     return res.end(JSON.stringify({ ok: true, data: cfg }))
   }
+  // 私有登记簿可自带图标文件:REGISTRY_DIR/icons/ 映射到 /icons/,条目里写 icon: /icons/xxx.svg 即可
+  if (url.pathname.startsWith('/icons/') && PRIVATE_REGISTRY) {
+    const dir = path.join(PRIVATE_REGISTRY, 'icons')
+    const file = path.join(dir, url.pathname.slice('/icons/'.length))
+    if (file.startsWith(dir + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) {
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' })
+      return res.end(fs.readFileSync(file))
+    }
+  }
   // 静态文件,禁止路径穿越;按目录优先级找(React dist → static)
   const rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1)
   for (const dir of STATIC_DIRS) {
