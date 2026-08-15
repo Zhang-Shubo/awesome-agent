@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+// 经 import 走 Vite 打包:文件名带内容哈希,换图即换 URL,浏览器缓存不会粘旧图
+import sheet from './pet-spritesheet.webp'
 
 // 桌宠:petdex.dev 的噜噜 lulu-capybara-2(MIT,Codex sprite 格式,v1 8x9 / v2 8x11 行含义相同)。
-// 雪碧图已缩到半尺寸,每格 96x104;换宠物 = 替换 public/pet/spritesheet.webp(同格式即可)。
+// 雪碧图已缩到半尺寸,每格 96x104;换宠物 = 替换 src/pet-spritesheet.webp(同格式即可)。
 const CW = 96, CH = 104
 const STATES = {
   idle:  { row: 0, frames: 6, ms: 1100 },
@@ -22,7 +24,7 @@ export default function Pet() {
   useEffect(() => {
     const img = new Image()
     img.onload = () => setOk(true)
-    img.src = '/pet/spritesheet.webp'
+    img.src = sheet
   }, [])
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function Pet() {
   if (!ok) return null
   return (
     <div className="pet" ref={box} title="噜噜 · 点我">
-      <i ref={spr} />
+      <i ref={spr} style={{ backgroundImage: `url(${sheet})` }} />
     </div>
   )
 }

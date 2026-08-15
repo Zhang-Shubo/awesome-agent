@@ -173,7 +173,11 @@ http.createServer(async (req, res) => {
   for (const dir of STATIC_DIRS) {
     const file = path.join(dir, rel)
     if (file.startsWith(dir) && fs.existsSync(file) && fs.statSync(file).isFile()) {
-      res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' })
+      res.writeHead(200, {
+        'content-type': MIME[path.extname(file)] || 'application/octet-stream',
+        // 构建产物文件名带内容哈希,可永久缓存;其余(html/favicon)每次协商,防止发版后粘旧页
+        'cache-control': rel.startsWith('assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+      })
       return res.end(fs.readFileSync(file))
     }
   }

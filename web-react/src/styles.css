@@ -107,7 +107,7 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 .pet { position: fixed; bottom: 0; left: 0; z-index: 25; cursor: pointer; width: 70px; height: 76px; overflow: hidden; }
 .pet i {
   display: block; width: 96px; height: 104px;
-  background: url(/pet/spritesheet.webp) no-repeat;
+  background-repeat: no-repeat;   /* 图片经 JS import 内联(带哈希文件名) */
   transform: scale(0.73); transform-origin: top left;
 }
 @media (prefers-reduced-motion: reduce) { .pet { display: none; } }
