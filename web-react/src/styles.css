@@ -16,21 +16,7 @@
   --blob-a: #c7d2fe; --blob-b: #fbcfe8; --blob-c: #a5f3fc;
   --sp-m: 48px; --sp-sm: 32px;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0e14;
-    --text: #f1f4f8;
-    --text-75: rgba(241, 244, 248, 0.78);
-    --muted: rgba(235, 235, 245, 0.58);
-    --glass: rgba(22, 26, 34, 0.55);
-    --glass-strong: rgba(22, 26, 34, 0.62);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --hairline: rgba(255, 255, 255, 0.1);
-    --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-    --btn-bg: #f1f4f8; --btn-fg: #0e1116;
-    --blob-a: #312e81; --blob-b: #701a4d; --blob-c: #164e63;
-  }
-}
+/* 固定明亮版:不跟随系统深色模式 */
 * { box-sizing: border-box; margin: 0; }
 body {
   background: var(--bg); color: var(--text);
