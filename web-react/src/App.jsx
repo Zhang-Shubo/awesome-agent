@@ -24,16 +24,21 @@ function Tile({ icon, name, href, children }) {
 export default function App() {
   const [projects, setProjects] = useState([])
   const [agents, setAgents] = useState([])
-  const [asOf, setAsOf] = useState(null)
+  const [theme, setTheme] = useState(localStorage.getItem('panel-theme') || 'light')
 
   useEffect(() => {
     Promise.all([
       fetch('/api/projects').then((r) => r.json()),
       fetch('/api/agents').then((r) => r.json()),
     ]).then(([p, a]) => {
-      setProjects(p.data); setAgents(a.data); setAsOf(p.asOf)
+      setProjects(p.data); setAgents(a.data)
     })
   }, [])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('panel-theme', theme)
+  }, [theme])
 
   return (
     <>
@@ -76,10 +81,11 @@ export default function App() {
           )}
         </section>
 
-        <footer>
-          <span className="meta">registry/ 驱动{asOf && ` · ${new Date(asOf).toLocaleString()}`}</span>
-        </footer>
       </div>
+      <button className="theme-btn" title="切换亮暗模式"
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
     </>
   )
 }

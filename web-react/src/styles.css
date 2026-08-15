@@ -13,6 +13,17 @@
   --green: #34c759; --orange: #ff9500;
   --blob-a: #c7d2fe; --blob-b: #fbcfe8; --blob-c: #a5f3fc;
 }
+:root[data-theme="dark"] {
+  --bg: #0b0e14;
+  --text: #f1f4f8;
+  --muted: rgba(235, 235, 245, 0.58);
+  --glass: rgba(22, 26, 34, 0.55);
+  --glass-strong: rgba(22, 26, 34, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --hairline: rgba(255, 255, 255, 0.1);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --blob-a: #312e81; --blob-b: #701a4d; --blob-c: #164e63;
+}
 * { box-sizing: border-box; margin: 0; }
 body {
   background: var(--bg); color: var(--text);
@@ -80,5 +91,11 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .empty code { font-size: 13px; }
 
-footer { margin-top: 72px; border-top: 1px solid var(--hairline); padding-top: 20px; }
-footer .meta { font-size: 12px; color: var(--muted); font-weight: 400; }
+/* 右下角亮暗切换 */
+.theme-btn {
+  position: fixed; right: 24px; bottom: 24px; z-index: 30;
+  width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--glass-border);
+  background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow);
+  font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
