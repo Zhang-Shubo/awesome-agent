@@ -60,8 +60,24 @@ function listEntries(dir) {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-const projects = () => listEntries(REGISTRY)
-const agents = () => listEntries(path.join(REGISTRY, 'agents'))
+// 私有登记簿 overlay:公共 registry/ 只放模板与愿意公开的条目,个人条目放私有目录
+// (config.env 的 REGISTRY_DIR,缺省 $AGENT_ROOT/registry),同名条目私有覆盖公共。
+const expand = (p) => (p || '')
+  .replace(/^~(?=\/|$)/, process.env.HOME || '~')
+  .replace(/\$HOME\b/g, process.env.HOME || '')
+const AGENT_ROOT = expand(readEnv('AGENT_ROOT'))
+const PRIVATE_REGISTRY = expand(readEnv('REGISTRY_DIR')) || (AGENT_ROOT && path.join(AGENT_ROOT, 'registry'))
+
+function mergeEntries(dirs) {
+  const map = new Map()
+  for (const dir of dirs.filter(Boolean)) for (const e of listEntries(dir)) map.set(e.name, e)
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+const projects = () => mergeEntries([REGISTRY, PRIVATE_REGISTRY])
+const agents = () => mergeEntries([
+  path.join(REGISTRY, 'agents'),
+  PRIVATE_REGISTRY && path.join(PRIVATE_REGISTRY, 'agents'),
+])
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
 
