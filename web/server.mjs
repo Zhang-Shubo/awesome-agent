@@ -105,7 +105,7 @@ const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/
 async function resolveLink(link) {
   const prompt = `分析这个链接:${link}
 用 WebFetch 读取它的内容后,只输出一个 JSON 对象,不要输出任何其他文字:
-{"name":"kebab-case 短名(小写字母数字横线)","icon":"一个最贴切的 emoji","summary":"一句话中文简介","repo":"若它是代码仓库,其 https clone 地址,否则空字符串","url":"若它是可直接访问的服务或网页,该链接本身,否则空字符串"}`
+{"name":"kebab-case 短名(小写字母数字横线)","icon":"优先用它自带的站点图标(<link rel=icon> 或 /favicon.svg、/favicon.ico,验证能访问)的绝对 URL;拿不到才用一个最贴切的 emoji","summary":"一句话中文简介","repo":"若它是代码仓库,其 https clone 地址,否则空字符串","url":"若它是可直接访问的服务或网页,该链接本身,否则空字符串"}`
   const { stdout } = await execFileP(
     'claude', ['-p', prompt, '--allowedTools', 'WebFetch', '--output-format', 'json'],
     { timeout: 180000, maxBuffer: 1024 * 1024 },

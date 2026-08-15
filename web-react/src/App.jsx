@@ -11,14 +11,22 @@ const repoUrl = (r) => {
   return m ? `https://${m[1]}/${m[2]}` : r
 }
 
-function Tile({ icon, name, href, editing, onDelete, children }) {
+// 图标既可以是 emoji,也可以是图片地址(项目自带的 favicon);图片加载失败退回 emoji
+const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
+
+function Tile({ icon, fallback, name, href, editing, onDelete, children }) {
   const Tag = href && !editing ? 'a' : 'div'
   return (
     <Tag className="tile" {...(href && !editing ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
       {editing && (
         <button className="tile-del" title="删除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}>✕</button>
       )}
-      <span className="tile-icon">{icon}</span>
+      <span className="tile-icon">
+        {isImgIcon(icon)
+          ? <img src={icon} alt="" loading="lazy"
+              onError={(e) => e.currentTarget.replaceWith(fallback || '📦')} />
+          : icon}
+      </span>
       <span className="tile-name">{name}</span>
       {!editing && <div className="pop">{children}</div>}
     </Tag>
@@ -126,7 +134,7 @@ export default function App() {
       {items.length || editing ? (
         <div className={`launcher ${editing ? 'editing' : ''}`}>
           {items.map((it) => (
-            <Tile key={it.name} icon={it.icon || fallbackIcon(it)} name={it.name}
+            <Tile key={it.name} icon={it.icon || fallbackIcon(it)} fallback={fallbackIcon(it)} name={it.name}
               href={it.url || (it.repo && repoUrl(it.repo))}
               editing={editing} onDelete={() => del(kind, it.name)}>
               {renderPop(it)}
