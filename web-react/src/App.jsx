@@ -17,8 +17,11 @@ const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith
 
 function Tile({ icon, fallback, name, href, editing, onDelete, children }) {
   const Tag = href && !editing ? 'a' : 'div'
+  // 点击进入后悬浮详情立即收起(纯 :hover 收不掉,点完鼠标还停在瓷贴上),移开鼠标后恢复
+  const [popHidden, setPopHidden] = useState(false)
   return (
-    <Tag className="tile" {...(href && !editing ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
+    <Tag className="tile" onClick={() => setPopHidden(true)} onMouseLeave={() => setPopHidden(false)}
+      {...(href && !editing ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
       {editing && (
         <button className="tile-del" title="删除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}>✕</button>
       )}
@@ -29,7 +32,7 @@ function Tile({ icon, fallback, name, href, editing, onDelete, children }) {
           : icon}
       </span>
       <span className="tile-name">{name}</span>
-      {!editing && <div className="pop">{children}</div>}
+      {!editing && !popHidden && <div className="pop">{children}</div>}
     </Tag>
   )
 }
