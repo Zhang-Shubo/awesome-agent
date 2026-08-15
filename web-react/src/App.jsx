@@ -34,16 +34,20 @@ export default function App() {
   const siteName = cfg.DOMAIN || 'awesome-agent'
 
   return (
-    <div className="shell">
+    <>
+      <div className="aurora"><i /><i /><i /></div>
       <nav className="nav">
-        <a className="site" href="/">🤖 {siteName}</a>
-        <div className="nav-items">
-          <a href="#projects">项目</a>
-          <a href="#agents">agent</a>
-          <a className="btn" href={`${REPO}/blob/main/docs/08-项目创建流程.md`}
-            target="_blank" rel="noopener noreferrer">新建项目</a>
+        <div className="nav-inner shell">
+          <a className="site" href="/">🤖 {siteName}</a>
+          <div className="nav-items">
+            <a href="#projects">项目</a>
+            <a href="#agents">agent</a>
+            <a className="btn" href={`${REPO}/blob/main/docs/08-项目创建流程.md`}
+              target="_blank" rel="noopener noreferrer">新建项目</a>
+          </div>
         </div>
       </nav>
+      <div className="shell">
 
       <header className="hero">
         <h1>agent 面板</h1>
@@ -117,6 +121,7 @@ export default function App() {
         <span className="site-foot">🤖 {siteName}</span>
         <span className="meta">数据来自 registry/{asOf && ` · 截至 ${new Date(asOf).toLocaleString()}`}</span>
       </footer>
-    </div>
+      </div>
+    </>
   )
 }
