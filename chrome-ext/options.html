@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>awesome-agent 面板设置</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+    margin: 0; padding: 18px 20px; width: 320px;
+    background: light-dark(#f7f7fb, #17171c); color: light-dark(#1c1c22, #e8e8ee);
+  }
+  h1 { font-size: 15px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  h1 img { width: 20px; height: 20px; border-radius: 5px; }
+  label { display: block; font-size: 12px; opacity: .75; margin-bottom: 4px; }
+  input[type=url] {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid light-dark(#d5d5e0, #33333d);
+    background: light-dark(#fff, #1f1f26); color: inherit; font-size: 13px;
+  }
+  input[type=url]:focus { outline: 2px solid #8b5cf6; border-color: transparent; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
+  .row label { margin: 0; opacity: 1; font-size: 13px; }
+  button {
+    width: 100%; padding: 8px 0; border: 0; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-size: 13px;
+  }
+  #tip { font-size: 12px; margin-top: 10px; min-height: 1.2em; color: #22c55e; }
+  #tip.err { color: #ef4444; }
+</style>
+</head>
+<body>
+  <h1><img src="icons/icon32.png" alt="">awesome-agent 面板</h1>
+  <label for="url">面板地址</label>
+  <input type="url" id="url" placeholder="https://your-panel.example.com">
+  <div class="row">
+    <input type="checkbox" id="startup" checked>
+    <label for="startup">Chrome 启动时自动打开</label>
+  </div>
+  <button id="save">保存</button>
+  <div id="tip"></div>
+  <script src="options.js"></script>
+</body>
+</html>
