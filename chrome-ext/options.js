@@ -1,8 +1,7 @@
 const $ = (id) => document.getElementById(id)
 
-chrome.storage.sync.get({ url: '', openOnStartup: true }).then((cfg) => {
+chrome.storage.sync.get({ url: '' }).then((cfg) => {
   $('url').value = cfg.url
-  $('startup').checked = cfg.openOnStartup
 })
 
 $('save').addEventListener('click', async () => {
@@ -15,7 +14,7 @@ $('save').addEventListener('click', async () => {
       return
     }
   }
-  await chrome.storage.sync.set({ url, openOnStartup: $('startup').checked })
+  await chrome.storage.sync.set({ url })
   tip.textContent = '已保存 ✓'
   tip.className = ''
 })

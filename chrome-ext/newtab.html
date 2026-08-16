@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>awesome-agent</title>
+<style>
+  /* 跳转前的一瞬间保持与面板相近的底色,避免白闪 */
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: light-dark(#f7f7fb, #101014); color: light-dark(#1c1c22, #e8e8ee);
+    font: 14px/1.7 -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+  }
+  #setup { display: none; text-align: center; }
+  #setup img { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 12px; }
+  #setup p { margin: 0 0 14px; opacity: .8; }
+  #setup button {
+    padding: 8px 22px; border: 0; border-radius: 9px; cursor: pointer; font-size: 13px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+  }
+</style>
+</head>
+<body>
+  <div id="setup">
+    <img src="icons/icon128.png" alt="">
+    <p>还没配置面板地址</p>
+    <button id="go">去设置</button>
+  </div>
+  <script src="newtab.js"></script>
+</body>
+</html>
