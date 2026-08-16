@@ -16,7 +16,7 @@ const repoUrl = (r) => {
 // 图标既可以是 emoji,也可以是图片地址(项目自带的 favicon);图片加载失败退回 emoji
 const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
 
-function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, children }) {
+function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, showPop = true, children }) {
   // onOpen 优先于 href:agent 瓷贴点击打开对话侧栏,仓库链接挪进悬浮详情
   const Tag = href && !editing && !onOpen ? 'a' : 'div'
   // 点击进入后悬浮详情立即收起(纯 :hover 收不掉,点完鼠标还停在瓷贴上),移开鼠标后恢复
@@ -35,7 +35,7 @@ function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, children 
           : icon}
       </span>
       <span className="tile-name">{name}</span>
-      {!editing && !popHidden && <div className="pop">{children}</div>}
+      {!editing && !popHidden && showPop && <div className="pop">{children}</div>}
     </Tag>
   )
 }
@@ -119,6 +119,23 @@ export default function App() {
   const [adding, setAdding] = useState(null)   // null | 'apps' | 'agents'
   const [chatOpen, setChatOpen] = useState(false)
   const [chatAgent, setChatAgent] = useState(null)   // null = 默认 Claude;点 agent 瓷贴则以其身份对话
+  // 偏好:noPop 关掉悬浮简介,noPet 关掉宠物;存 localStorage
+  const [prefs, setPrefs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('panel-prefs')) || {} } catch { return {} }
+  })
+  const [setsOpen, setSetsOpen] = useState(false)
+  const togglePref = (k) => setPrefs((p) => {
+    const n = { ...p, [k]: !p[k] }
+    localStorage.setItem('panel-prefs', JSON.stringify(n))
+    return n
+  })
+  // 设置弹层:点外面自动收起
+  useEffect(() => {
+    if (!setsOpen) return
+    const close = (e) => { if (!e.target.closest('.setpop, .set-btn')) setSetsOpen(false) }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [setsOpen])
 
   const reload = () =>
     Promise.all([
@@ -140,7 +157,7 @@ export default function App() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
-      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, a, button, input, select, textarea')
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
       if (editingRef.current || !blank(e)) return
@@ -180,7 +197,7 @@ export default function App() {
             <Tile key={it.name} icon={it.icon || fallbackIcon(it)} fallback={fallbackIcon(it)} name={it.name}
               href={it.url || (it.repo && repoUrl(it.repo))}
               editing={editing} onDelete={() => del(kind, it.name)}
-              onOpen={onOpen && (() => onOpen(it))}>
+              onOpen={onOpen && (() => onOpen(it))} showPop={!prefs.noPop}>
               {renderPop(it)}
             </Tile>
           ))}
@@ -220,9 +237,18 @@ export default function App() {
         ), (a) => KIND_ICON[a.kind] || '🦾',
         (a) => { setChatAgent(a); setChatOpen(true) })}
       </div>
-      <Pet />
+      {!prefs.noPet && <Pet />}
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}
+      <button className="fab set-btn" title="设置" onClick={() => setSetsOpen((v) => !v)}>⚙️</button>
+      {setsOpen && (
+        <div className="setpop">
+          <label className="setrow">悬浮显示简介
+            <input type="checkbox" checked={!prefs.noPop} onChange={() => togglePref('noPop')} /></label>
+          <label className="setrow">桌面宠物
+            <input type="checkbox" checked={!prefs.noPet} onChange={() => togglePref('noPet')} /></label>
+        </div>
+      )}
       <Chat open={chatOpen} agent={chatAgent} onClose={() => setChatOpen(false)} />
       <button className="fab chat-btn" title="AI 对话"
         onClick={() => { if (chatOpen) { setChatOpen(false) } else { setChatAgent(null); setChatOpen(true) } }}>✨</button>
