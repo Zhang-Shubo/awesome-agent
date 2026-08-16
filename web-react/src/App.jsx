@@ -16,13 +16,15 @@ const repoUrl = (r) => {
 // 图标既可以是 emoji,也可以是图片地址(项目自带的 favicon);图片加载失败退回 emoji
 const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
 
-function Tile({ icon, fallback, name, href, editing, onDelete, children }) {
-  const Tag = href && !editing ? 'a' : 'div'
+function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, children }) {
+  // onOpen 优先于 href:agent 瓷贴点击打开对话侧栏,仓库链接挪进悬浮详情
+  const Tag = href && !editing && !onOpen ? 'a' : 'div'
   // 点击进入后悬浮详情立即收起(纯 :hover 收不掉,点完鼠标还停在瓷贴上),移开鼠标后恢复
   const [popHidden, setPopHidden] = useState(false)
   return (
-    <Tag className="tile" onClick={() => setPopHidden(true)} onMouseLeave={() => setPopHidden(false)}
-      {...(href && !editing ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
+    <Tag className="tile" onMouseLeave={() => setPopHidden(false)}
+      onClick={() => { setPopHidden(true); if (!editing && onOpen) onOpen() }}
+      {...(href && !editing && !onOpen ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
       {editing && (
         <button className="tile-del" title="删除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}>✕</button>
       )}
@@ -116,6 +118,7 @@ export default function App() {
   const [editing, setEditing] = useState(false)
   const [adding, setAdding] = useState(null)   // null | 'apps' | 'agents'
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatAgent, setChatAgent] = useState(null)   // null = 默认 Claude;点 agent 瓷贴则以其身份对话
 
   const reload = () =>
     Promise.all([
@@ -168,7 +171,7 @@ export default function App() {
     reload()
   }
 
-  const group = (kind, title, items, renderPop, fallbackIcon) => (
+  const group = (kind, title, items, renderPop, fallbackIcon, onOpen) => (
     <section>
       <h2>{title}</h2>
       {items.length || editing ? (
@@ -176,7 +179,8 @@ export default function App() {
           {items.map((it) => (
             <Tile key={it.name} icon={it.icon || fallbackIcon(it)} fallback={fallbackIcon(it)} name={it.name}
               href={it.url || (it.repo && repoUrl(it.repo))}
-              editing={editing} onDelete={() => del(kind, it.name)}>
+              editing={editing} onDelete={() => del(kind, it.name)}
+              onOpen={onOpen && (() => onOpen(it))}>
               {renderPop(it)}
             </Tile>
           ))}
@@ -210,14 +214,18 @@ export default function App() {
               <span className="status"><i />{KIND[a.kind] || a.kind || '—'}</span></p>
             {a.summary && <p className="pop-body">{a.summary}</p>}
             {a.entry && <p className="pop-entry"><code>{a.entry}</code></p>}
+            {a.repo && <p className="pop-entry"><a href={repoUrl(a.repo)} target="_blank" rel="noopener noreferrer">仓库 ↗</a></p>}
+            <p className="pop-hint">点击开始对话</p>
           </>
-        ), (a) => KIND_ICON[a.kind] || '🦾')}
+        ), (a) => KIND_ICON[a.kind] || '🦾',
+        (a) => { setChatAgent(a); setChatOpen(true) })}
       </div>
       <Pet />
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}
-      <Chat open={chatOpen} onClose={() => setChatOpen(false)} />
-      <button className="fab chat-btn" title="AI 对话" onClick={() => setChatOpen((v) => !v)}>✨</button>
+      <Chat open={chatOpen} agent={chatAgent} onClose={() => setChatOpen(false)} />
+      <button className="fab chat-btn" title="AI 对话"
+        onClick={() => { if (chatOpen) { setChatOpen(false) } else { setChatAgent(null); setChatOpen(true) } }}>✨</button>
       <button className="fab theme-btn" title="切换亮暗模式"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
         {theme === 'dark' ? '☀️' : '🌙'}

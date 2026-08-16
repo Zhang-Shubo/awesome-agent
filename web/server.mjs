@@ -35,8 +35,17 @@ function parseEntry(dir, file) {
   const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   const meta = {}
   if (m) {
-    for (const line of m[1].split('\n')) {
-      const kv = line.match(/^([\w-]+):\s*([^#]*)/)
+    const lines = m[1].split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      // 块标量:`key: |` 后跟缩进行,收集为多行值(agent 的 prompt 用)
+      const blk = lines[i].match(/^([\w-]+):\s*\|\s*$/)
+      if (blk) {
+        const buf = []
+        while (i + 1 < lines.length && /^(\s{2,}|\s*$)/.test(lines[i + 1])) buf.push(lines[++i].replace(/^\s{2}/, ''))
+        meta[blk[1]] = buf.join('\n').trim()
+        continue
+      }
+      const kv = lines[i].match(/^([\w-]+):\s*([^#]*)/)
       if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '')
     }
   }
@@ -50,6 +59,7 @@ function parseEntry(dir, file) {
     kind: meta.kind || '',
     entry: meta.entry || '',
     icon: meta.icon || '',
+    prompt: meta.prompt || '',
     hidden: meta.hidden === 'true',
     summary: body.replace(/\s+/g, ' ').slice(0, 300),
     url: link ? link[0].replace(/[),.;]$/, '') : '',
@@ -185,6 +195,11 @@ http.createServer(async (req, res) => {
     // 写入授权档位由前端选择:缺省只读(headless 默认拒绝写类工具)
     const permMode = String(body.permissionMode || '')
     if (['acceptEdits', 'bypassPermissions', 'plan'].includes(permMode)) args.push('--permission-mode', permMode)
+    // 以某个登记簿 agent 的身份对话:提示词由服务端从登记簿取,不信任客户端传的内容
+    if (body.agent) {
+      const a = agents().find((e) => e.name === String(body.agent))
+      if (a?.prompt) args.push('--append-system-prompt', a.prompt)
+    }
     args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
     const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT
     const child = spawn('claude', args, { cwd, env: process.env })

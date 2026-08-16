@@ -67,7 +67,14 @@ const groupTools = (tools) => {
   return order
 }
 
-export default function Chat({ open, onClose }) {
+// 图标既可以是 emoji 也可以是图片地址(与 App 的瓷贴同规则)
+const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
+const Ava = ({ icon, fallback = '✨' }) =>
+  isImgIcon(icon) ? <img src={icon} alt="" /> : <>{icon || fallback}</>
+
+// agent:登记簿里的 agent 条目(name/icon/summary/prompt),null = 默认 Claude。
+// 会话按 agent 隔离:切换时保存当前对话,切回来还在;有 prompt 的 agent 由后端注入系统提示词。
+export default function Chat({ open, agent, onClose }) {
   const [msgs, setMsgs] = useState([])   // { role:'user'|'ai', text, tools:[{name,hint}], status, live }
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -85,6 +92,25 @@ export default function Chat({ open, onClose }) {
   const runningRef = useRef(false)
   const activeRef = useRef(null)    // 当前轮的 { ctrl, typer },供中断/清理
 
+  // 会话按 agent 隔离:key = agent 名('' 为默认 Claude),切换时把当前对话存进抽屉,切回原样恢复
+  const key = agent?.name || ''
+  const keyRef = useRef(key)
+  const storeRef = useRef({})
+  const msgsRef = useRef(msgs)
+  useEffect(() => { msgsRef.current = msgs }, [msgs])
+  useEffect(() => {
+    if (key === keyRef.current) return
+    storeRef.current[keyRef.current] = { msgs: msgsRef.current, sid: sidRef.current }
+    queueRef.current = []
+    activeRef.current?.ctrl.abort()   // 换身份不带走上一个身份进行中的轮次
+    const s = storeRef.current[key] || { msgs: [], sid: null }
+    keyRef.current = key
+    setMsgs(s.msgs)
+    sidRef.current = s.sid
+    setStick(true)
+    inputRef.current?.focus()
+  }, [key])
+
   useEffect(() => { if (stick) bodyRef.current?.scrollTo(0, 1e9) }, [msgs, stick])
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
 
@@ -99,10 +125,11 @@ export default function Chat({ open, onClose }) {
   // 跑一轮:创建 ai 气泡(记住下标——队列模式下它未必是最后一条),SSE 流式填充
   const runTurn = async (text) => {
     setStick(true)
+    const turnKey = keyRef.current   // 本轮所属的 agent;切走后 upd 不再改到新对话的消息上
     let aiIdx = -1
     setMsgs((m) => { aiIdx = m.length; return [...m, { role: 'ai', text: '', tools: [], denied: [], status: '启动 claude…', live: true }] })
     const upd = (fn) => setMsgs((m) => {
-      if (aiIdx < 0 || !m[aiIdx]) return m
+      if (keyRef.current !== turnKey || aiIdx < 0 || !m[aiIdx]) return m
       const c = m.slice(); c[aiIdx] = fn(c[aiIdx]); return c
     })
     // 每轮独立的打字机
@@ -124,6 +151,11 @@ export default function Chat({ open, onClose }) {
     const setTarget = (s) => { typer.target = s; pump() }
     const ctrl = new AbortController()
     activeRef.current = { ctrl, typer }
+    // session id 也归本轮的 agent:切走后写回它的抽屉,不污染当前对话
+    const setSid = (sid) => {
+      if (keyRef.current === turnKey) sidRef.current = sid
+      else if (storeRef.current[turnKey]) storeRef.current[turnKey].sid = sid
+    }
     // acc = 本轮已定稿文本(工具调用会分多条 assistant 消息),streamed = 当前消息增量
     let acc = '', streamed = ''
     const seenTools = new Set()   // partial 快照会重复携带同一 tool_use,按 id 去重
@@ -135,6 +167,7 @@ export default function Chat({ open, onClose }) {
           message: text, sessionId: sidRef.current,
           model: modelRef.current || undefined,
           permissionMode: permRef.current || undefined,
+          agent: turnKey || undefined,
         }),
         signal: ctrl.signal,
       })
@@ -150,7 +183,7 @@ export default function Chat({ open, onClose }) {
           if (!raw.startsWith('data: ')) continue
           let ev; try { ev = JSON.parse(raw.slice(6)) } catch { continue }
           if (ev.type === 'system' && ev.subtype === 'init') {
-            sidRef.current = ev.session_id
+            setSid(ev.session_id)
             upd((x) => ({ ...x, status: `思考中…(${ev.model || 'claude'})` }))
           } else if (ev.type === 'stream_event' && ev.event?.delta?.type === 'text_delta') {
             streamed += ev.event.delta.text
@@ -176,7 +209,7 @@ export default function Chat({ open, onClose }) {
               }
             }
           } else if (ev.type === 'result') {
-            if (ev.session_id) sidRef.current = ev.session_id
+            if (ev.session_id) setSid(ev.session_id)
             if (ev.is_error && !acc) setTarget(String(ev.result || ev.subtype || '出错了'))
           } else if (ev.type === 'error') {
             setTarget((typer.target ? typer.target + '\n\n' : '') + `⚠️ ${ev.error}`)
@@ -234,7 +267,8 @@ export default function Chat({ open, onClose }) {
     <aside className={`chat ${open ? 'open' : ''}`}>
       <div className="chat-head">
         <div className="chat-head-top">
-          <b>AI 对话</b>
+          <span className="chat-ava"><Ava icon={agent?.icon} /></span>
+          <b>{agent?.name || 'AI 对话'}</b>
           <span className="chat-sub">{busy ? `思考中…${queued ? `(+${queued} 排队)` : ''}` : (sidRef.current ? '会话中' : '新会话')}</span>
           {busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
           <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
@@ -254,7 +288,16 @@ export default function Chat({ open, onClose }) {
         </div>
       </div>
       <div className="chat-body" ref={bodyRef} onScroll={onScroll}>
-        {msgs.length === 0 && <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>}
+        {msgs.length === 0 && (
+          agent?.prompt ? (
+            <div className="chat-hello">
+              <span className="hello-ava"><Ava icon={agent.icon} /></span>
+              <b>{agent.name}</b><br />{agent.summary}
+            </div>
+          ) : (
+            <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>
+          )
+        )}
         {msgs.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
             {m.tools?.length > 0 && (
