@@ -111,6 +111,7 @@ function AddForm({ kind, onClose, onSaved }) {
 export default function App() {
   const [apps, setApps] = useState([])
   const [agents, setAgents] = useState([])
+  const [loaded, setLoaded] = useState(false)   // 首次数据未回来前不渲染空态,避免刷新时闪「还没有条目」
   const [theme, setTheme] = useState(localStorage.getItem('panel-theme') || 'light')
   const [editing, setEditing] = useState(false)
   const [adding, setAdding] = useState(null)   // null | 'apps' | 'agents'
@@ -120,7 +121,7 @@ export default function App() {
     Promise.all([
       fetch('/api/apps').then((r) => r.json()),
       fetch('/api/agents').then((r) => r.json()),
-    ]).then(([p, a]) => { setApps(p.data); setAgents(a.data) })
+    ]).then(([p, a]) => { setApps(p.data); setAgents(a.data); setLoaded(true) })
 
   useEffect(() => { reload() }, [])
 
@@ -186,9 +187,9 @@ export default function App() {
             </button>
           )}
         </div>
-      ) : (
+      ) : loaded ? (
         <div className="empty">还没有条目 —— 长按页面空白处进入编辑模式新增。</div>
-      )}
+      ) : null}
     </section>
   )
 
