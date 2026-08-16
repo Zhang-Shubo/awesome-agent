@@ -73,6 +73,11 @@ export default function Chat({ open, onClose }) {
   const [busy, setBusy] = useState(false)
   const [stick, setStick] = useState(true)   // 吸附底部:用户上滑看历史时松开,不再被流式输出拽回去
   const [model, setModel] = useState(localStorage.getItem('chat-model') || '')
+  const [perm, setPerm] = useState(localStorage.getItem('chat-perm') || '')   // '' 只读 | acceptEdits | bypassPermissions
+  const modelRef = useRef(model)
+  const permRef = useRef(perm)
+  useEffect(() => { modelRef.current = model }, [model])
+  useEffect(() => { permRef.current = perm }, [perm])
   const sidRef = useRef(null)
   const bodyRef = useRef(null)
   const inputRef = useRef(null)
@@ -89,12 +94,13 @@ export default function Chat({ open, onClose }) {
   }
   const toLatest = () => { bodyRef.current?.scrollTo({ top: 1e9, behavior: 'smooth' }); setStick(true) }
   const pickModel = (e) => { setModel(e.target.value); localStorage.setItem('chat-model', e.target.value) }
+  const pickPerm = (e) => { setPerm(e.target.value); localStorage.setItem('chat-perm', e.target.value) }
 
   // 跑一轮:创建 ai 气泡(记住下标——队列模式下它未必是最后一条),SSE 流式填充
   const runTurn = async (text) => {
     setStick(true)
     let aiIdx = -1
-    setMsgs((m) => { aiIdx = m.length; return [...m, { role: 'ai', text: '', tools: [], status: '启动 claude…', live: true }] })
+    setMsgs((m) => { aiIdx = m.length; return [...m, { role: 'ai', text: '', tools: [], denied: [], status: '启动 claude…', live: true }] })
     const upd = (fn) => setMsgs((m) => {
       if (aiIdx < 0 || !m[aiIdx]) return m
       const c = m.slice(); c[aiIdx] = fn(c[aiIdx]); return c
@@ -121,10 +127,15 @@ export default function Chat({ open, onClose }) {
     // acc = 本轮已定稿文本(工具调用会分多条 assistant 消息),streamed = 当前消息增量
     let acc = '', streamed = ''
     const seenTools = new Set()   // partial 快照会重复携带同一 tool_use,按 id 去重
+    const toolNames = new Map()   // tool_use id → 名字,用于把授权拒绝对应回工具
     try {
       const r = await fetch('/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: text, sessionId: sidRef.current, model: model || undefined }),
+        body: JSON.stringify({
+          message: text, sessionId: sidRef.current,
+          model: modelRef.current || undefined,
+          permissionMode: permRef.current || undefined,
+        }),
         signal: ctrl.signal,
       })
       const reader = r.body.getReader()
@@ -150,7 +161,19 @@ export default function Chat({ open, onClose }) {
             if (txt) { acc += (acc ? '\n\n' : '') + txt; streamed = ''; setTarget(acc) }
             for (const b of blocks) if (b.type === 'tool_use' && !seenTools.has(b.id)) {
               seenTools.add(b.id)
+              toolNames.set(b.id, b.name)
               upd((x) => ({ ...x, status: `运行 ${b.name}…`, tools: [...x.tools, { name: b.name, hint: toolHint(b.input) }] }))
+            }
+          } else if (ev.type === 'user') {
+            // 工具结果:headless 下未授权的写操作会被静默拒绝,这里把拒绝显性化
+            for (const b of (ev.message?.content || [])) {
+              if (b.type !== 'tool_result' || !b.is_error) continue
+              const rtxt = typeof b.content === 'string' ? b.content
+                : (Array.isArray(b.content) ? b.content.map((c) => c.text || '').join(' ') : '')
+              if (/permission|granted|denied|授权/i.test(rtxt)) {
+                const name = toolNames.get(b.tool_use_id) || '工具'
+                upd((x) => (x.denied.includes(name) ? x : { ...x, denied: [...x.denied, name] }))
+              }
             }
           } else if (ev.type === 'result') {
             if (ev.session_id) sidRef.current = ev.session_id
@@ -195,21 +218,40 @@ export default function Chat({ open, onClose }) {
     setMsgs([]); sidRef.current = null; inputRef.current?.focus()
   }
 
+  // 被拒后的一键授权重试:切到「可编辑」,续会话让它补做刚才被拒的操作
+  const retryWithPerm = () => {
+    const v = 'acceptEdits'
+    setPerm(v); permRef.current = v; localStorage.setItem('chat-perm', v)
+    const text = '我已授权写入(可编辑文件),请继续完成刚才因权限被拒的操作。'
+    setMsgs((m) => [...m, { role: 'user', text }])
+    queueRef.current.push(text)
+    drain()
+  }
+
   const queued = queueRef.current.length
 
   return (
     <aside className={`chat ${open ? 'open' : ''}`}>
       <div className="chat-head">
-        <b>AI 对话</b>
-        <span className="chat-sub">{busy ? `思考中…${queued ? `(+${queued} 排队)` : ''}` : (sidRef.current ? '会话中' : '新会话')}</span>
-        <select className="chat-model" value={model} onChange={pickModel} title="切换模型(下一条生效)">
-          <option value="">sonnet · 默认</option>
-          <option value="haiku">haiku · 快</option>
-          <option value="opus">opus · 强</option>
-        </select>
-        {busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
-        <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
-        <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
+        <div className="chat-head-top">
+          <b>AI 对话</b>
+          <span className="chat-sub">{busy ? `思考中…${queued ? `(+${queued} 排队)` : ''}` : (sidRef.current ? '会话中' : '新会话')}</span>
+          {busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
+          <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
+          <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
+        </div>
+        <div className="chat-opts">
+          <select className="chat-model" value={model} onChange={pickModel} title="切换模型(下一条生效)">
+            <option value="">sonnet · 默认</option>
+            <option value="haiku">haiku · 快</option>
+            <option value="opus">opus · 强</option>
+          </select>
+          <select className="chat-model" value={perm} onChange={pickPerm} title="写入授权(下一条生效)">
+            <option value="">🔒 只读 · 默认</option>
+            <option value="acceptEdits">✏️ 可编辑文件</option>
+            <option value="bypassPermissions">⚡ 全权限</option>
+          </select>
+        </div>
       </div>
       <div className="chat-body" ref={bodyRef} onScroll={onScroll}>
         {msgs.length === 0 && <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>}
@@ -223,6 +265,12 @@ export default function Chat({ open, onClose }) {
             {m.role === 'ai'
               ? <span className={`md ${m.live ? 'live' : ''}`} dangerouslySetInnerHTML={{ __html: mdHtml(m.text) }} />
               : m.text}
+            {m.denied?.length > 0 && (
+              <span className="msg-denied">
+                ⛔ {m.denied.join('、')} 需要写入授权,已被拒
+                {!m.live && <button onClick={retryWithPerm}>授权并重试</button>}
+              </span>
+            )}
             {m.live && m.status && <span className="msg-status">{m.status}</span>}
           </div>
         ))}

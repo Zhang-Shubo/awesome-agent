@@ -182,6 +182,9 @@ http.createServer(async (req, res) => {
     const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
       '--model', model]
     if (body.sessionId) args.push('--resume', String(body.sessionId))
+    // 写入授权档位由前端选择:缺省只读(headless 默认拒绝写类工具)
+    const permMode = String(body.permissionMode || '')
+    if (['acceptEdits', 'bypassPermissions', 'plan'].includes(permMode)) args.push('--permission-mode', permMode)
     args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
     const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT
     const child = spawn('claude', args, { cwd, env: process.env })
