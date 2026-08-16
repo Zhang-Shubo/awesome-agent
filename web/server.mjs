@@ -177,8 +177,10 @@ http.createServer(async (req, res) => {
     try { body = JSON.parse(await readBody(req)) } catch { return send(400, { ok: false, error: '请求体不是 JSON' }) }
     const message = String(body.message || '').trim()
     if (!message) return send(400, { ok: false, error: '空消息' })
+    const reqModel = String(body.model || '').trim()
+    const model = /^[a-z0-9._-]{1,64}$/i.test(reqModel) ? reqModel : (readEnv('CHAT_MODEL') || 'sonnet')
     const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--model', readEnv('CHAT_MODEL') || 'sonnet']
+      '--model', model]
     if (body.sessionId) args.push('--resume', String(body.sessionId))
     args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
     const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT

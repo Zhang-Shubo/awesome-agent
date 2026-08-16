@@ -101,7 +101,7 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
   font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   color: var(--text);
 }
-.chat-btn { right: 24px; bottom: 24px; }
+.chat-btn { right: 24px; top: 24px; }
 .theme-btn { left: 24px; bottom: 24px; }
 
 /* AI 对话侧边栏:玻璃拟态右抽屉,常驻挂载靠 transform 收放 */
@@ -261,3 +261,9 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .btn2.primary { background: #0e1116; color: #fff; border-color: transparent; }
 :root[data-theme="dark"] .btn2.primary { background: #f1f4f8; color: #0e1116; }
+
+/* 对话头部模型切换 */
+.chat-model {
+  border: 1px solid var(--glass-border); background: var(--glass); color: var(--muted);
+  border-radius: 999px; font-size: 11px; padding: 3px 8px; outline: none; cursor: pointer; max-width: 118px;
+}
