@@ -60,6 +60,7 @@ function parseEntry(dir, file) {
     entry: meta.entry || '',
     icon: meta.icon || '',
     prompt: meta.prompt || '',
+    tools: meta.tools || '',
     hidden: meta.hidden === 'true',
     summary: body.replace(/\s+/g, ' ').slice(0, 300),
     url: link ? link[0].replace(/[),.;]$/, '') : '',
@@ -195,10 +196,12 @@ http.createServer(async (req, res) => {
     // 写入授权档位由前端选择:缺省只读(headless 默认拒绝写类工具)
     const permMode = String(body.permissionMode || '')
     if (['acceptEdits', 'bypassPermissions', 'plan'].includes(permMode)) args.push('--permission-mode', permMode)
-    // 以某个登记簿 agent 的身份对话:提示词由服务端从登记簿取,不信任客户端传的内容
+    // 以某个登记簿 agent 的身份对话:提示词/工具白名单由服务端从登记簿取,不信任客户端传的内容。
+    // tools 空格分隔(如 "Read Bash(sqlite3:*)"),白名单内的工具在只读档也免授权直批
     if (body.agent) {
       const a = agents().find((e) => e.name === String(body.agent))
       if (a?.prompt) args.push('--append-system-prompt', a.prompt)
+      if (a?.tools) args.push('--allowedTools', a.tools.split(/[\s,]+/).filter(Boolean).join(','))
     }
     args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
     const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT
