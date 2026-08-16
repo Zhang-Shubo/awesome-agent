@@ -88,6 +88,15 @@ const toolHint = (input = {}) => {
   const v = input.command || input.file_path || input.pattern || input.url || input.path || input.query || ''
   return String(v).replace(/\s+/g, ' ').slice(0, 42)
 }
+// 同名工具聚合(保持首次出现顺序):连读 12 个文件显示成一颗「Read ×12」,不刷屏
+const groupTools = (tools) => {
+  const order = [], byName = new Map()
+  for (const t of tools) {
+    if (!byName.has(t.name)) { byName.set(t.name, { name: t.name, count: 0, hint: '' }); order.push(byName.get(t.name)) }
+    const g = byName.get(t.name); g.count++; g.hint = t.hint || g.hint
+  }
+  return order
+}
 
 // AI 对话侧边栏:后端 /api/chat 以 SSE 透传 claude CLI 的 stream-json。
 // 常驻挂载(关闭仅平移隐藏),对话与 sessionId 得以保留;多轮靠 --resume。
@@ -138,6 +147,7 @@ function Chat({ open, onClose }) {
     t.target = ''; t.done = false
     // acc = 本轮已定稿文本(工具调用会分多条 assistant 消息),streamed = 当前消息增量
     let acc = '', streamed = ''
+    const seenTools = new Set()   // partial 快照会重复携带同一 tool_use,按 id 去重
     const setTarget = (s) => { t.target = s; pump() }
     try {
       const r = await fetch('/api/chat', {
@@ -165,7 +175,8 @@ function Chat({ open, onClose }) {
             const blocks = ev.message?.content || []
             const txt = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('')
             if (txt) { acc += (acc ? '\n\n' : '') + txt; streamed = ''; setTarget(acc) }
-            for (const b of blocks) if (b.type === 'tool_use') {
+            for (const b of blocks) if (b.type === 'tool_use' && !seenTools.has(b.id)) {
+              seenTools.add(b.id)
               upd((x) => ({ ...x, status: `运行 ${b.name}…`, tools: [...x.tools, { name: b.name, hint: toolHint(b.input) }] }))
             }
           } else if (ev.type === 'result') {
@@ -206,8 +217,8 @@ function Chat({ open, onClose }) {
           return (
             <div key={i} className={`msg ${m.role}`}>
               {m.tools?.length > 0 && (
-                <span className="msg-tools">{m.tools.map((t, j) => (
-                  <i key={j}>🔧 {t.name}{t.hint ? <em> {t.hint}</em> : null}</i>
+                <span className="msg-tools">{groupTools(m.tools).map((t, j) => (
+                  <i key={j}>🔧 {t.name}{t.count > 1 ? ` ×${t.count}` : t.hint ? <em> {t.hint}</em> : null}</i>
                 ))}</span>
               )}
               {m.role === 'ai'
