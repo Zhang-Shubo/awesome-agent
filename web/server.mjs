@@ -168,29 +168,41 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     return res.end(JSON.stringify({ ok: true, data: cfg }))
   }
-  // AI 对话:流式透传本机 claude CLI 的 stream-json(NDJSON),认证复用 CLI 登录态。
-  // 多轮靠 --resume <sessionId>;工作目录默认 $AGENT_ROOT。headless 下写类工具默认被拒,
-  // 需要更多权限可在 config.env 设 CHAT_ARGS(如 --permission-mode acceptEdits)。
+  // AI 对话:流式透传本机 claude CLI 的 stream-json,认证复用 CLI 登录态。
+  // 用 SSE(text/event-stream)而非裸 NDJSON——Cloudflare 边缘对 event-stream 不缓冲,流才顺。
+  // 多轮靠 --resume <sessionId>;工作目录默认 $AGENT_ROOT;模型缺省 sonnet(快),config.env 的
+  // CHAT_MODEL 可换;headless 下写类工具默认被拒,CHAT_ARGS 可加 --permission-mode 等放开。
   if (url.pathname === '/api/chat' && req.method === 'POST') {
     let body
     try { body = JSON.parse(await readBody(req)) } catch { return send(400, { ok: false, error: '请求体不是 JSON' }) }
     const message = String(body.message || '').trim()
     if (!message) return send(400, { ok: false, error: '空消息' })
-    const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--include-partial-messages']
+    const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+      '--model', readEnv('CHAT_MODEL') || 'sonnet']
     if (body.sessionId) args.push('--resume', String(body.sessionId))
     args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
     const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT
     const child = spawn('claude', args, { cwd, env: process.env })
-    res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-cache' })
-    child.stdout.pipe(res, { end: false })
-    let errBuf = ''
-    child.stderr.on('data', (c) => { errBuf += c })
-    const fail = (msg) => { if (!res.writableEnded) { res.write(JSON.stringify({ type: 'error', error: msg }) + '\n'); res.end() } }
-    child.on('error', (e) => fail(`claude 启动失败:${e.message}`))
-    child.on('close', (code) => {
-      if (code !== 0) return fail((errBuf.trim() || `claude 退出码 ${code}`).slice(-800))
-      if (!res.writableEnded) res.end()
+    res.writeHead(200, {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-cache', connection: 'keep-alive', 'x-accel-buffering': 'no',
     })
+    const emit = (line) => { if (!res.writableEnded) res.write(`data: ${line}\n\n`) }
+    let out = '', errBuf = ''
+    child.stdout.on('data', (c) => {
+      out += c
+      const lines = out.split('\n'); out = lines.pop()
+      for (const l of lines) if (l.trim()) emit(l)
+    })
+    child.stderr.on('data', (c) => { errBuf += c })
+    const finish = (errMsg) => {
+      if (out.trim()) emit(out)
+      if (errMsg) emit(JSON.stringify({ type: 'error', error: errMsg }))
+      emit('{"type":"done"}')
+      if (!res.writableEnded) res.end()
+    }
+    child.on('error', (e) => finish(`claude 启动失败:${e.message}`))
+    child.on('close', (code) => finish(code !== 0 ? (errBuf.trim() || `claude 退出码 ${code}`).slice(-800) : null))
     req.on('close', () => child.kill('SIGTERM'))
     return
   }

@@ -37,27 +37,108 @@ function Tile({ icon, fallback, name, href, editing, onDelete, children }) {
   )
 }
 
-// AI 对话侧边栏:后端 /api/chat 透传 claude CLI 的 stream-json,前端解析 NDJSON 流式渲染。
+// 极简 markdown → html(先转义再上标记,安全):#标题 / -与1.列表 / |表格| / >引用 / ---
+// / ```代码块 / **粗** / `码` / [链接](url)。与 fin-jargon 的渲染器同族。
+const escMd = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+function mdHtml(src) {
+  const inline = (s) => escMd(s)
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+  let out = '', list = false, table = null, fence = null
+  const closeList = () => { if (list) { out += '</ul>'; list = false } }
+  const closeTable = () => {
+    if (!table) return
+    const [h, ...b] = table
+    out += `<div class="tblwrap"><table><thead><tr>${h.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
+      b.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+    table = null
+  }
+  for (const line of (src || '').split('\n')) {
+    if (fence !== null) {
+      if (line.trim().startsWith('```')) { out += `<pre>${escMd(fence)}</pre>`; fence = null }
+      else fence += (fence ? '\n' : '') + line
+      continue
+    }
+    const t = line.trim()
+    if (t.startsWith('```')) { closeList(); closeTable(); fence = ''; continue }
+    if (t.startsWith('|') && t.endsWith('|') && t.length > 2) {
+      closeList()
+      if (!table) table = []
+      if (!/^\|[\s:|-]+\|$/.test(t)) table.push(t.slice(1, -1).split('|').map((c) => inline(c.trim())))
+      continue
+    }
+    closeTable()
+    if (list && !/^[-*] |^\d+[.)] /.test(t)) closeList()
+    if (!t) continue
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) { out += '<hr>'; continue }
+    if (t.startsWith('#')) { out += `<h4>${inline(t.replace(/^#+\s*/, ''))}</h4>`; continue }
+    if (t.startsWith('> ')) { out += `<blockquote>${inline(t.slice(2))}</blockquote>`; continue }
+    if (/^[-*] /.test(t)) { if (!list) { out += '<ul>'; list = true } out += `<li>${inline(t.slice(2))}</li>`; continue }
+    if (/^\d+[.)] /.test(t)) { if (!list) { out += '<ul>'; list = true } out += `<li>${inline(t.replace(/^\d+[.)] /, ''))}</li>`; continue }
+    out += `<p>${inline(t)}</p>`
+  }
+  closeList(); closeTable()
+  if (fence !== null) out += `<pre>${escMd(fence)}</pre>`   // 流式中未闭合的代码块也先渲染
+  return out
+}
+
+// 工具调用参数摘要:胶囊里带一眼能看懂的入参提示
+const toolHint = (input = {}) => {
+  const v = input.command || input.file_path || input.pattern || input.url || input.path || input.query || ''
+  return String(v).replace(/\s+/g, ' ').slice(0, 42)
+}
+
+// AI 对话侧边栏:后端 /api/chat 以 SSE 透传 claude CLI 的 stream-json。
 // 常驻挂载(关闭仅平移隐藏),对话与 sessionId 得以保留;多轮靠 --resume。
+// 流式渲染做了打字机平滑:网络突发到达的大块文本按帧匀速放出,消除一卡一卡。
 function Chat({ open, onClose }) {
-  const [msgs, setMsgs] = useState([])   // { role: 'user'|'ai', text, tools: [] }
+  const [msgs, setMsgs] = useState([])   // { role:'user'|'ai', text, tools:[{name,hint}], status }
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const sidRef = useRef(null)
   const bodyRef = useRef(null)
   const inputRef = useRef(null)
+  const typer = useRef({ target: '', timer: null, done: true })
 
   useEffect(() => { bodyRef.current?.scrollTo(0, 1e9) }, [msgs])
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+
+  const upd = (fn) => setMsgs((m) => { const c = m.slice(); c[c.length - 1] = fn(c[c.length - 1]); return c })
+
+  // 打字机泵:每帧把已显示文本向 target 逼近,差距越大步子越大(突发也只需 ~0.5s 追平)
+  const pump = () => {
+    const t = typer.current
+    if (t.timer) return
+    t.timer = setInterval(() => {
+      upd((x) => {
+        const shown = x.text.length
+        if (shown >= t.target.length) {
+          if (t.done) { clearInterval(t.timer); t.timer = null }
+          return x
+        }
+        const step = Math.max(2, Math.ceil((t.target.length - shown) / 12))
+        return { ...x, text: t.target.slice(0, shown + step), status: null }
+      })
+    }, 33)
+  }
+  const flushTyper = () => {
+    const t = typer.current
+    t.done = true
+    if (t.timer) { clearInterval(t.timer); t.timer = null }
+    upd((x) => ({ ...x, text: t.target, status: null }))
+  }
 
   const send = async () => {
     const text = input.trim()
     if (!text || busy) return
     setInput(''); setBusy(true)
-    setMsgs((m) => [...m, { role: 'user', text }, { role: 'ai', text: '', tools: [] }])
-    const upd = (fn) => setMsgs((m) => { const c = m.slice(); c[c.length - 1] = fn(c[c.length - 1]); return c })
-    // acc = 本轮已定稿的助手文本(工具调用会分多条 assistant 消息),streamed = 当前消息的增量
+    setMsgs((m) => [...m, { role: 'user', text }, { role: 'ai', text: '', tools: [], status: '启动 claude…' }])
+    const t = typer.current
+    t.target = ''; t.done = false
+    // acc = 本轮已定稿文本(工具调用会分多条 assistant 消息),streamed = 当前消息增量
     let acc = '', streamed = ''
+    const setTarget = (s) => { t.target = s; pump() }
     try {
       const r = await fetch('/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -71,34 +152,44 @@ function Chat({ open, onClose }) {
         if (done) break
         buf += dec.decode(value, { stream: true })
         const lines = buf.split('\n'); buf = lines.pop()
-        for (const line of lines) {
-          if (!line.trim()) continue
-          let ev; try { ev = JSON.parse(line) } catch { continue }
-          if (ev.type === 'system' && ev.subtype === 'init') sidRef.current = ev.session_id
-          else if (ev.type === 'stream_event' && ev.event?.delta?.type === 'text_delta') {
+        for (const raw of lines) {
+          if (!raw.startsWith('data: ')) continue
+          let ev; try { ev = JSON.parse(raw.slice(6)) } catch { continue }
+          if (ev.type === 'system' && ev.subtype === 'init') {
+            sidRef.current = ev.session_id
+            upd((x) => ({ ...x, status: `思考中…(${ev.model || 'claude'})` }))
+          } else if (ev.type === 'stream_event' && ev.event?.delta?.type === 'text_delta') {
             streamed += ev.event.delta.text
-            upd((x) => ({ ...x, text: acc + streamed }))
+            setTarget(acc + streamed)
           } else if (ev.type === 'assistant') {
             const blocks = ev.message?.content || []
             const txt = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('')
-            if (txt) { acc += (acc ? '\n' : '') + txt; streamed = '' ; upd((x) => ({ ...x, text: acc })) }
-            for (const b of blocks) if (b.type === 'tool_use') upd((x) => ({ ...x, tools: [...x.tools, b.name] }))
+            if (txt) { acc += (acc ? '\n\n' : '') + txt; streamed = ''; setTarget(acc) }
+            for (const b of blocks) if (b.type === 'tool_use') {
+              upd((x) => ({ ...x, status: `运行 ${b.name}…`, tools: [...x.tools, { name: b.name, hint: toolHint(b.input) }] }))
+            }
           } else if (ev.type === 'result') {
             if (ev.session_id) sidRef.current = ev.session_id
-            if (ev.is_error && !acc) upd((x) => ({ ...x, text: String(ev.result || ev.subtype || '出错了') }))
+            if (ev.is_error && !acc) setTarget(String(ev.result || ev.subtype || '出错了'))
           } else if (ev.type === 'error') {
-            upd((x) => ({ ...x, text: (acc ? acc + '\n' : '') + `⚠️ ${ev.error}` }))
+            setTarget((t.target ? t.target + '\n\n' : '') + `⚠️ ${ev.error}`)
           }
         }
       }
     } catch (e) {
-      upd((x) => ({ ...x, text: (x.text || '') + `\n⚠️ ${e.message || e}` }))
+      setTarget((t.target ? t.target + '\n\n' : '') + `⚠️ ${e.message || e}`)
     }
-    upd((x) => (x.text ? x : { ...x, text: '(无输出)' }))
+    if (!t.target) t.target = '(无输出)'
+    flushTyper()
     setBusy(false)
   }
 
-  const reset = () => { setMsgs([]); sidRef.current = null; inputRef.current?.focus() }
+  const reset = () => {
+    const t = typer.current
+    if (t.timer) { clearInterval(t.timer); t.timer = null }
+    t.target = ''; t.done = true
+    setMsgs([]); sidRef.current = null; inputRef.current?.focus()
+  }
 
   return (
     <aside className={`chat ${open ? 'open' : ''}`}>
@@ -110,14 +201,22 @@ function Chat({ open, onClose }) {
       </div>
       <div className="chat-body" ref={bodyRef}>
         {msgs.length === 0 && <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>}
-        {msgs.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>
-            {m.tools?.length > 0 && (
-              <span className="msg-tools">{[...new Set(m.tools)].map((t) => <i key={t}>🔧 {t}</i>)}</span>
-            )}
-            {m.text || (busy && i === msgs.length - 1 ? '…' : '')}
-          </div>
-        ))}
+        {msgs.map((m, i) => {
+          const live = busy && i === msgs.length - 1
+          return (
+            <div key={i} className={`msg ${m.role}`}>
+              {m.tools?.length > 0 && (
+                <span className="msg-tools">{m.tools.map((t, j) => (
+                  <i key={j}>🔧 {t.name}{t.hint ? <em> {t.hint}</em> : null}</i>
+                ))}</span>
+              )}
+              {m.role === 'ai'
+                ? <span className={`md ${live ? 'live' : ''}`} dangerouslySetInnerHTML={{ __html: mdHtml(m.text) }} />
+                : m.text}
+              {live && m.status && <span className="msg-status">{m.status}</span>}
+            </div>
+          )
+        })}
       </div>
       <div className="chat-input">
         <textarea ref={inputRef} rows="1" value={input} placeholder="输入消息,Enter 发送"
