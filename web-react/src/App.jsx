@@ -105,13 +105,20 @@ function Chat({ open, onClose }) {
   const [msgs, setMsgs] = useState([])   // { role:'user'|'ai', text, tools:[{name,hint}], status }
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [stick, setStick] = useState(true)   // 吸附底部:用户上滑看历史时松开,不再被流式输出拽回去
   const sidRef = useRef(null)
   const bodyRef = useRef(null)
   const inputRef = useRef(null)
   const typer = useRef({ target: '', timer: null, done: true })
 
-  useEffect(() => { bodyRef.current?.scrollTo(0, 1e9) }, [msgs])
+  useEffect(() => { if (stick) bodyRef.current?.scrollTo(0, 1e9) }, [msgs, stick])
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+
+  const onScroll = () => {
+    const el = bodyRef.current
+    if (el) setStick(el.scrollHeight - el.scrollTop - el.clientHeight < 60)
+  }
+  const toLatest = () => { bodyRef.current?.scrollTo({ top: 1e9, behavior: 'smooth' }); setStick(true) }
 
   const upd = (fn) => setMsgs((m) => { const c = m.slice(); c[c.length - 1] = fn(c[c.length - 1]); return c })
 
@@ -141,7 +148,7 @@ function Chat({ open, onClose }) {
   const send = async () => {
     const text = input.trim()
     if (!text || busy) return
-    setInput(''); setBusy(true)
+    setInput(''); setBusy(true); setStick(true)
     setMsgs((m) => [...m, { role: 'user', text }, { role: 'ai', text: '', tools: [], status: '启动 claude…' }])
     const t = typer.current
     t.target = ''; t.done = false
@@ -210,7 +217,7 @@ function Chat({ open, onClose }) {
         <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
         <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
       </div>
-      <div className="chat-body" ref={bodyRef}>
+      <div className="chat-body" ref={bodyRef} onScroll={onScroll}>
         {msgs.length === 0 && <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>}
         {msgs.map((m, i) => {
           const live = busy && i === msgs.length - 1
@@ -229,6 +236,9 @@ function Chat({ open, onClose }) {
           )
         })}
       </div>
+      {!stick && msgs.length > 0 && (
+        <button className="chat-down" title="回到最新" onClick={toLatest}>↓</button>
+      )}
       <div className="chat-input">
         <textarea ref={inputRef} rows="1" value={input} placeholder="输入消息,Enter 发送"
           onChange={(e) => setInput(e.target.value)}

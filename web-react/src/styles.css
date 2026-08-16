@@ -178,6 +178,13 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 .md.live > *:last-child::after {
   content: "▍"; margin-left: 1px; color: #6366f1; animation: pulse 0.9s ease-in-out infinite;
 }
+.chat-down {
+  position: absolute; right: 16px; bottom: 72px; z-index: 3;
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--glass-border);
+  background: var(--glass-strong); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  color: var(--text); font-size: 15px; cursor: pointer; box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+}
 .chat-input { display: flex; align-items: flex-end; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--glass-border); }
 .chat-input textarea {
   flex: 1; resize: none; max-height: 120px; padding: 9px 12px;
