@@ -34,7 +34,7 @@ CLAUDE.md 固定章节骨架(模板见 [templates/CLAUDE.md](../templates/CLAUDE
 
 ## skill 规范(Claude Code)
 
-- **源码 / 部署位分离**:仓库是源码,`~/.claude/skills/` 是部署位,`sync.sh` 用 rsync 单向覆盖,**刻意不动线上的 `config.env`(密钥)和 `.venv`**;
+- **源码即部署位**:通用 skill 仓库直接放 `$AGENT_ROOT/skills`,`~/.claude/skills` 软链过去(见 [07](07-目录框架.md)),改完即生效;运行时文件(`config.env` 密钥、`.venv`)由 .gitignore 排除,只存在本机;
 - SKILL.md frontmatter:`name` / `description`(含母语触发语)/ `argument-hint` / `allowed-tools`(细粒度到 `Bash(ssh *)`)/ `user-invocable`,模板见 [templates/SKILL.md](../templates/SKILL.md);
 - 落点用「双模式」:本地写知识库,云端沙箱写仓库 `reports/` 再 commit(见 [01](01-知识库.md))。
 
