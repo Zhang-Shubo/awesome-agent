@@ -1,6 +1,6 @@
 ---
 name: new-agent
-description: 创建/登记新 agent。当用户说"新建 agent""创建 agent""登记 agent""写个 agent""new agent"时触发。写登记簿条目(kind/runs-on/tools/prompt)→ 放到面板所在机器的登记簿 → 验证面板可见、chat 可用。
+description: 创建/登记新 agent。当用户说"新建 agent""创建 agent""登记 agent""写个 agent""new agent"时触发。收三要素(名字/简介/头像)→ 写登记簿条目(kind/runs-on/tools/prompt)→ 头像与条目放到面板所在机器 → 验证面板可见、chat 可用。
 argument-hint: <agent-name> [--kind interactive|service|scheduled] [--public]
 allowed-tools: Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(scp *), Bash(ssh *), Bash(curl *), Bash(git *), Read, Write, Edit, Glob, Grep
 user-invocable: true
@@ -10,15 +10,21 @@ user-invocable: true
 
 agent = 登记簿里的一个 md 条目(格式见 [registry/agents/_example.md](../../registry/agents/_example.md)),不是一份代码。本 skill 固化登记动线;**skill 本身不含个人信息**,机器与路径来自实例工作空间(`$AGENT_ROOT`)。
 
-## 0. 收集要素(缺则问用户)
+## 0. 收集三要素(与 new-project 同规:缺则问用户;用户让你定的,定完在汇报里报备)
+
+| 要素 | 约定 |
+|---|---|
+| 名字 | 小写 kebab-case,= 登记文件名;一眼看出职责(如 event-curator),不用泛词 |
+| 简介 | 一句话说清干什么,写进条目正文;面板 tile 与对话开场白都展示它 |
+| 头像 | **必配,不是可选**:512 viewBox、rx115、强调色渐变底 + 单个白 glyph 的家族风格(与项目面板图标同母题);放**面板机** `REGISTRY_DIR/icons/<name>.svg`,条目写 `icon: /icons/<name>.svg`。头像出现在面板 tile 和右侧对话抽屉,是 agent 的身份标识,缺了会退回默认 emoji |
+
+再收技术字段:
 
 | 字段 | 约定 |
 |---|---|
-| `name` | 小写 kebab-case,= 文件名 |
 | `kind` | `interactive` 面板对话 / `service` 常驻服务 / `scheduled` 定时任务 |
 | `runs-on` | **执行机**。interactive 的执行机 = 面板所在机器(chat 由面板进程 spawn `claude`,cwd 为该机 `$AGENT_ROOT`),不是你写条目的机器 |
 | `entry` | service/scheduled 必填:入口/状态命令;interactive 可省 |
-| `icon` | 可选:图标放面板机 `REGISTRY_DIR/icons/<name>.svg`,条目写 `icon: /icons/<name>.svg` |
 | `tools` | interactive 专用:工具白名单,空格分隔(如 `Read Bash(sqlite3:*)`),面板翻成 `--allowedTools`,白名单内免授权直批。**只给只读工具,写操作让 prompt 要求先确认** |
 | `prompt` | interactive 专用:系统提示词(`prompt: \|` 多行块),面板翻成 `--append-system-prompt` |
 
@@ -44,7 +50,7 @@ agent = 登记簿里的一个 md 条目(格式见 [registry/agents/_example.md](
 
 ## 4. 验证与收尾
 
-1. 面板机上 `curl -s 127.0.0.1:<PANEL_PORT>/api/agents` 确认条目在列;
+1. 面板机上 `curl -s 127.0.0.1:<PANEL_PORT>/api/agents` 确认条目在列,且 `icon` 字段非空、图标 URL 可访问;
 2. interactive 的在面板 chat 里选中试问一句,确认 prompt 生效、白名单工具免授权;
 3. 本机私有工作区仓库 commit(条目纳入版本管理);公共条目在 awesome-agent 仓库 commit。
 
