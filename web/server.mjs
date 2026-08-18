@@ -253,7 +253,11 @@ http.createServer(async (req, res) => {
     if (hit && Date.now() - hit.at < 3600_000) return send(200, { ok: true, data: hit.data })
     const d = { color: '' }
     try {
-      const r = await fetch(app.url, { signal: AbortSignal.timeout(5000) })
+      // 公网入口可能挂在 Cloudflare Access 后面(匿名抓到的是登录页),登记过 widget-api 的
+      // app 就近走它的内网 origin 抓首页
+      let probe = app.url
+      if (app.widgetApi) { try { probe = new URL(app.widgetApi).origin } catch { /* 保持公网 url */ } }
+      const r = await fetch(probe, { signal: AbortSignal.timeout(5000) })
       const html = (await r.text()).slice(0, 65536)
       const m = html.match(/<meta[^>]+name=["']theme-color["'][^>]*content=["']([^"']+)["']/i)
         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*name=["']theme-color["']/i)
