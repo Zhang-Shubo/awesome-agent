@@ -45,7 +45,8 @@ function parseEntry(dir, file) {
         meta[blk[1]] = buf.join('\n').trim()
         continue
       }
-      const kv = lines[i].match(/^([\w-]+):\s*([^#]*)/)
+      // 行内注释只认「空白 + #」,否则 URL 锚点(widget-link: ...#topics)会被截断
+      const kv = lines[i].match(/^([\w-]+):\s*(.*?)(?:\s+#.*)?$/)
       if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, '')
     }
   }
@@ -62,6 +63,10 @@ function parseEntry(dir, file) {
     prompt: meta.prompt || '',
     tools: meta.tools || '',
     hidden: meta.hidden === 'true',
+    // 面板小组件(可选,约定见 docs/07):widget-api 是面板机内网数据端点,只在服务端用,不下发浏览器
+    widgetApi: meta['widget-api'] || '',
+    widgetLink: meta['widget-link'] || '',
+    widgetTitle: meta['widget-title'] || '',
     summary: body.replace(/\s+/g, ' ').slice(0, 300),
     url: link ? link[0].replace(/[),.;]$/, '') : '',
   }
@@ -151,6 +156,9 @@ const readBody = (req) => new Promise((resolve) => {
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
 
+// 小组件数据缓存(name → { at, data }):60s 内直接回缓存,护住各 app 上游
+const widgetCache = new Map()
+
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
   const send = (code, data) => {
@@ -160,7 +168,8 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/api/apps' || url.pathname === '/api/agents') {
     const isAgents = url.pathname === '/api/agents'
     if (req.method === 'GET') {
-      return send(200, { ok: true, data: isAgents ? agents() : apps(), asOf: new Date().toISOString() })
+      // widgetApi 是内网地址,永不出后端;小组件数据走 /api/widgets 代理
+      return send(200, { ok: true, data: isAgents ? agents() : apps().map(({ widgetApi, ...e }) => e), asOf: new Date().toISOString() })
     }
     // 写操作只落私有登记簿,公共库永远不被 web 改动
     if (!PRIVATE_REGISTRY) return send(400, { ok: false, error: '未配置私有登记簿(config.env 的 AGENT_ROOT 或 REGISTRY_DIR)' })
@@ -189,6 +198,28 @@ http.createServer(async (req, res) => {
       }
       return send(200, { ok: true })
     }
+  }
+  // 小组件:代理登记簿声明的 widget-api(只代理登记的 URL,不接受客户端指定;内网地址不出后端)。
+  // 失败如实返回 {ok:false,error} 由前端原样展示,不编造、不丢弃。
+  if (url.pathname === '/api/widgets' && req.method === 'GET') {
+    const list = apps().filter((e) => e.widgetApi)
+    const data = await Promise.all(list.map(async (e) => {
+      const base = { name: e.name, icon: e.icon, title: e.widgetTitle || e.name, link: e.widgetLink || e.url }
+      const hit = widgetCache.get(e.name)
+      if (hit && Date.now() - hit.at < 60_000) return { ...base, ...hit.data }
+      let d
+      try {
+        const r = await fetch(e.widgetApi, { signal: AbortSignal.timeout(8000) })
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const j = await r.json()
+        if (!j.ok || !Array.isArray(j.items)) throw new Error(j.error || '数据格式不符')
+        // 只透传约定字段并截 20 条,上游塞的任意结构不进面板
+        d = { ok: true, items: j.items.slice(0, 20).map((it) => ({ text: String(it.text || ''), url: String(it.url || ''), time: it.time ? String(it.time) : '' })) }
+      } catch (err) { d = { ok: false, error: String(err.message || err).slice(0, 200) } }
+      widgetCache.set(e.name, { at: Date.now(), data: d })
+      return { ...base, ...d }
+    }))
+    return send(200, { ok: true, data, asOf: new Date().toISOString() })
   }
   if (url.pathname === '/api/config') {
     const cfg = Object.fromEntries(SAFE_KEYS.map(k => [k, readEnv(k) || '']).filter(([, v]) => v))

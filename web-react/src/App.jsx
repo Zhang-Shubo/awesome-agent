@@ -40,6 +40,41 @@ function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, showPop =
   )
 }
 
+// 小组件:登记簿声明 widget-api 的 app 在面板常驻一张实时内容卡(数据走 /api/widgets 服务端代理,约定见 docs/07)
+const relTime = (iso) => {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (isNaN(m)) return ''
+  if (m < 1) return '刚刚'
+  if (m < 60) return `${m} 分钟前`
+  const h = Math.round(m / 60)
+  return h < 24 ? `${h} 小时前` : `${Math.round(h / 24)} 天前`
+}
+
+function Widget({ w }) {
+  return (
+    <div className="widget">
+      <div className="widget-head">
+        <span className="widget-ico">{isImgIcon(w.icon) ? <img src={w.icon} alt="" /> : (w.icon || '📦')}</span>
+        <b>{w.title}</b>
+      </div>
+      {w.ok ? (
+        <div className="widget-list">
+          {w.items.slice(0, 6).map((it, i) => (
+            <a key={i} href={it.url || w.link} target="_blank" rel="noopener noreferrer">
+              <span className="wi-text">{it.text}</span>
+              {it.time && <span className="wi-time">{relTime(it.time)}</span>}
+            </a>
+          ))}
+          {!w.items.length && <p className="widget-err">暂无内容</p>}
+        </div>
+      ) : (
+        <p className="widget-err">数据暂不可用:{w.error}</p>
+      )}
+      {w.link && <a className="widget-more" href={w.link} target="_blank" rel="noopener noreferrer">查看全部 →</a>}
+    </div>
+  )
+}
+
 function AddForm({ kind, onClose, onSaved }) {
   const isAgent = kind === 'agents'
   const [f, setF] = useState({ link: '', name: '', icon: '', repo: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
@@ -146,6 +181,15 @@ export default function App() {
 
   useEffect(() => { reload() }, [])
 
+  // 小组件:进页拉一次,之后 5 分钟一轮(面板是启动台不是监控台);页面在后台时跳过
+  const [widgets, setWidgets] = useState([])
+  useEffect(() => {
+    const pull = () => { if (!document.hidden) fetch('/api/widgets').then((r) => r.json()).then((d) => setWidgets(d.data || [])).catch(() => {}) }
+    pull()
+    const t = setInterval(pull, 300_000)
+    return () => clearInterval(t)
+  }, [])
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('panel-theme', theme)
@@ -156,7 +200,7 @@ export default function App() {
     if (!chatOpen) return
     const h = (e) => {
       if (e.button !== 0) return
-      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, a, button, input, select, textarea')) return
+      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, .widget, a, button, input, select, textarea')) return
       setChatOpen(false)
     }
     document.addEventListener('mousedown', h)
@@ -170,7 +214,7 @@ export default function App() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
-      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, a, button, input, select, textarea')
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, .widget, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
       if (editingRef.current || !blank(e)) return
@@ -249,6 +293,12 @@ export default function App() {
           </>
         ), (a) => KIND_ICON[a.kind] || '🦾',
         (a) => { setChatAgent(a); setChatOpen(true) })}
+        {widgets.length > 0 && !prefs.noWidget && (
+          <section>
+            <h2>小组件</h2>
+            <div className="widgets">{widgets.map((w) => <Widget key={w.name} w={w} />)}</div>
+          </section>
+        )}
       </div>
       {!prefs.noPet && <Pet />}
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
@@ -260,6 +310,8 @@ export default function App() {
             <input type="checkbox" checked={!prefs.noPop} onChange={() => togglePref('noPop')} /></label>
           <label className="setrow">桌面宠物
             <input type="checkbox" checked={!prefs.noPet} onChange={() => togglePref('noPet')} /></label>
+          <label className="setrow">小组件
+            <input type="checkbox" checked={!prefs.noWidget} onChange={() => togglePref('noWidget')} /></label>
           <label className="setrow">暗色模式
             <input type="checkbox" checked={theme === 'dark'}
               onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')} /></label>
