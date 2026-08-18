@@ -91,13 +91,18 @@ function AppShell({ app, onClose }) {
   }, [app.name])
   useEffect(() => {
     if (!bg) return
+    // iOS 26 起 Safari 忽略 theme-color meta,状态栏颜色实时取自视口顶部元素/body 的背景色
+    // (https://x.com/dannymoerkerke/status/1995944519632912570)——html/body/meta 一起换,新旧系统都覆盖
     const html = document.documentElement
+    const body = document.body
     const meta = document.querySelector('meta[name="theme-color"]')
-    const prev = { bg: html.style.backgroundColor, meta: meta?.getAttribute('content') }
+    const prev = { html: html.style.backgroundColor, body: body.style.backgroundColor, meta: meta?.getAttribute('content') }
     html.style.backgroundColor = bg
+    body.style.backgroundColor = bg
     meta?.setAttribute('content', bg)
     return () => {
-      html.style.backgroundColor = prev.bg
+      html.style.backgroundColor = prev.html
+      body.style.backgroundColor = prev.body
       if (prev.meta) meta?.setAttribute('content', prev.meta)
     }
   }, [bg])
