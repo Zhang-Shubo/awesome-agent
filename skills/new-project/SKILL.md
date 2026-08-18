@@ -56,7 +56,7 @@ favicon.svg(64 viewBox、rx14、强调色底白 glyph)→ `qlmanage -t -s 128` �
 ## 6. 注册面板(默认必做,docs/08 第 8 步)
 
 1. 生成面板图标:512 viewBox、rx115、渐变底 + 白 glyph(与 64 favicon 同一母题),放到 **panel: true 那台机器**的 `$AGENT_ROOT/registry/icons/<name>.svg`(本机无 panel 机器时写本机 registry);
-2. 写登记条目 `$AGENT_ROOT/registry/<name>.md`:name / icon(`/icons/<name>.svg`)/ repo / status / runs-on + 一句话简介 + 访问入口(有域名写域名,没有写仓库);
+2. 写登记条目 `$AGENT_ROOT/registry/<name>.md`:name / icon(`/icons/<name>.svg`)/ repo / status / runs-on + 一句话简介 + 访问入口(有域名写域名,没有写仓库);项目若提供面板小组件,再补 widget-api / widget-link / widget-title(约定见 awesome-agent docs/07);
 3. 收尾清单:项目 CLAUDE.md 补上线信息(域名/机器/端口/隧道/Access app id/发布命令)、知识库记一笔、新挂的 Access 应用记入记忆。
 
 ## 完成汇报
