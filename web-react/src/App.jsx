@@ -151,6 +151,18 @@ export default function App() {
     localStorage.setItem('panel-theme', theme)
   }, [theme])
 
+  // 对话抽屉开着时,点击抽屉外的空白处收起(交互控件各自管理开合,不在此列)
+  useEffect(() => {
+    if (!chatOpen) return
+    const h = (e) => {
+      if (e.button !== 0) return
+      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, a, button, input, select, textarea')) return
+      setChatOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [chatOpen])
+
   // 仿 iOS 主屏:空白处长按(550ms,位移<8px)进入编辑,编辑中单击空白处退出。
   // 监听器只挂一次,editing 经 ref 读——若依赖 [editing] 重挂,fired 标志会被重置,
   // 长按松开的 click 就被误判成"单击空白"而立即退出编辑。
