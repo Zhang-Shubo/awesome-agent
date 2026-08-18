@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 // AI 对话侧边栏(独立组件):后端 /api/chat 以 SSE 透传 claude CLI 的 stream-json。
 // - 常驻挂载(关闭仅平移隐藏),对话与 sessionId 保留;多轮靠 --resume
+// - 多 agent 并行:会话按 agent 键控,各有独立队列与进行中轮次,切走后台继续跑;
+//   左侧书签栏(头像)切换,忙碌的亮指示点
 // - 打字机平滑:突发到达的大块文本按帧匀速放出
 // - 回答中可继续发消息:进队列,当前轮结束后依次发出;⏹ 可中断当前轮
 // - 头部可切模型(默认 sonnet,haiku 更快,opus 更强),存 localStorage
@@ -63,21 +65,6 @@ function mdHtml(src) {
   return out
 }
 
-// 工具调用参数摘要:胶囊里带一眼能看懂的入参提示
-const toolHint = (input = {}) => {
-  const v = input.command || input.file_path || input.pattern || input.url || input.path || input.query || ''
-  return String(v).replace(/\s+/g, ' ').slice(0, 42)
-}
-// 同名工具聚合(保持首次出现顺序):连读 12 个文件显示成一颗「Read ×12」,不刷屏
-const groupTools = (tools) => {
-  const order = [], byName = new Map()
-  for (const t of tools) {
-    if (!byName.has(t.name)) { byName.set(t.name, { name: t.name, count: 0, hint: '' }); order.push(byName.get(t.name)) }
-    const g = byName.get(t.name); g.count++; g.hint = t.hint || g.hint
-  }
-  return order
-}
-
 // 用户消息是纯文本渲染,这里把其中的 URL 拆成可点击的 <a> 节点(不经 HTML 注入)
 const linkNodes = (text) => String(text).split(new RegExp(`(${BARE_URL.source})`)).map((part, i) =>
   i % 2
@@ -93,17 +80,33 @@ const timeAgo = (ts) => {
   return `${Math.floor(s / 86400)} 天前`
 }
 
+// 工具调用参数摘要:胶囊里带一眼能看懂的入参提示
+const toolHint = (input = {}) => {
+  const v = input.command || input.file_path || input.pattern || input.url || input.path || input.query || ''
+  return String(v).replace(/\s+/g, ' ').slice(0, 42)
+}
+// 同名工具聚合(保持首次出现顺序):连读 12 个文件显示成一颗「Read ×12」,不刷屏
+const groupTools = (tools) => {
+  const order = [], byName = new Map()
+  for (const t of tools) {
+    if (!byName.has(t.name)) { byName.set(t.name, { name: t.name, count: 0, hint: '' }); order.push(byName.get(t.name)) }
+    const g = byName.get(t.name); g.count++; g.hint = t.hint || g.hint
+  }
+  return order
+}
+
 // 图标既可以是 emoji 也可以是图片地址(与 App 的瓷贴同规则)
 const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
 const Ava = ({ icon, fallback = '✨' }) =>
   isImgIcon(icon) ? <img src={icon} alt="" /> : <>{icon || fallback}</>
 
+const EMPTY_CONV = { agent: null, msgs: [], sid: null, busy: false, queued: 0 }
+
 // agent:登记簿里的 agent 条目(name/icon/summary/prompt),null = 默认 Claude。
-// 会话按 agent 隔离:切换时保存当前对话,切回来还在;有 prompt 的 agent 由后端注入系统提示词。
-export default function Chat({ open, agent, onClose }) {
-  const [msgs, setMsgs] = useState([])   // { role:'user'|'ai', text, tools:[{name,hint}], status, live }
+// 会话按 agent 键控并行:每个 agent 有独立的消息、session、发送队列;左侧书签切换。
+export default function Chat({ open, agent, onClose, onSwitch }) {
+  const [convs, setConvs] = useState({})   // key → { agent, msgs, sid, busy, queued }
   const [input, setInput] = useState('')
-  const [busy, setBusy] = useState(false)
   const [stick, setStick] = useState(true)   // 吸附底部:用户上滑看历史时松开,不再被流式输出拽回去
   const [model, setModel] = useState(localStorage.getItem('chat-model') || '')
   const [perm, setPerm] = useState(localStorage.getItem('chat-perm') || '')   // '' 只读 | acceptEdits | bypassPermissions
@@ -112,34 +115,27 @@ export default function Chat({ open, agent, onClose }) {
   const permRef = useRef(perm)
   useEffect(() => { modelRef.current = model }, [model])
   useEffect(() => { permRef.current = perm }, [perm])
-  const sidRef = useRef(null)
+  const convsRef = useRef(convs)
+  useEffect(() => { convsRef.current = convs }, [convs])
   const bodyRef = useRef(null)
   const inputRef = useRef(null)
-  const queueRef = useRef([])       // 回答中新发的消息排队,依次跑
-  const runningRef = useRef(false)
-  const activeRef = useRef(null)    // 当前轮的 { ctrl, typer },供中断/清理
+  // 每个 agent 一个执行器:队列 + 进行中轮次;互不干扰,可同时跑
+  const runnersRef = useRef({})
+  const runner = (k) => (runnersRef.current[k] ||= { queue: [], running: false, active: null })
 
-  // 会话按 agent 隔离:key = agent 名('' 为默认 Claude),切换时把当前对话存进抽屉,切回原样恢复
   const key = agent?.name || ''
-  const keyRef = useRef(key)
-  const storeRef = useRef({})
-  const msgsRef = useRef(msgs)
-  useEffect(() => { msgsRef.current = msgs }, [msgs])
+  const conv = convs[key] || EMPTY_CONV
+  const patch = (k, fn) => setConvs((c) => ({ ...c, [k]: fn(c[k] || { ...EMPTY_CONV }) }))
+
+  // 切到某个 agent:登记/刷新它的会话条目(书签由 convs 的键生成)
   useEffect(() => {
-    if (key === keyRef.current) return
-    storeRef.current[keyRef.current] = { msgs: msgsRef.current, sid: sidRef.current }
-    queueRef.current = []
-    activeRef.current?.ctrl.abort()   // 换身份不带走上一个身份进行中的轮次
-    const s = storeRef.current[key] || { msgs: [], sid: null }
-    keyRef.current = key
-    setMsgs(s.msgs)
-    sidRef.current = s.sid
+    patch(key, (v) => ({ ...v, agent: agent || v.agent }))
     setHist(null)
     setStick(true)
     inputRef.current?.focus()
   }, [key])
 
-  useEffect(() => { if (stick) bodyRef.current?.scrollTo(0, 1e9) }, [msgs, stick])
+  useEffect(() => { if (stick) bodyRef.current?.scrollTo(0, 1e9) }, [conv.msgs, stick])
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
 
   const onScroll = () => {
@@ -150,15 +146,16 @@ export default function Chat({ open, agent, onClose }) {
   const pickModel = (e) => { setModel(e.target.value); localStorage.setItem('chat-model', e.target.value) }
   const pickPerm = (e) => { setPerm(e.target.value); localStorage.setItem('chat-perm', e.target.value) }
 
-  // 跑一轮:创建 ai 气泡(记住下标——队列模式下它未必是最后一条),SSE 流式填充
-  const runTurn = async (text) => {
-    setStick(true)
-    const turnKey = keyRef.current   // 本轮所属的 agent;切走后 upd 不再改到新对话的消息上
+  // 跑一轮:在所属 agent 的会话里追加 ai 气泡,SSE 流式填充;切走后照常后台更新
+  const runTurn = async (turnKey, text) => {
     let aiIdx = -1
-    setMsgs((m) => { aiIdx = m.length; return [...m, { role: 'ai', text: '', tools: [], denied: [], status: '启动 claude…', live: true }] })
-    const upd = (fn) => setMsgs((m) => {
-      if (keyRef.current !== turnKey || aiIdx < 0 || !m[aiIdx]) return m
-      const c = m.slice(); c[aiIdx] = fn(c[aiIdx]); return c
+    patch(turnKey, (v) => {
+      aiIdx = v.msgs.length
+      return { ...v, msgs: [...v.msgs, { role: 'ai', text: '', tools: [], denied: [], status: '启动 claude…', live: true }] }
+    })
+    const upd = (fn) => patch(turnKey, (v) => {
+      if (aiIdx < 0 || !v.msgs[aiIdx]) return v
+      const m = v.msgs.slice(); m[aiIdx] = fn(m[aiIdx]); return { ...v, msgs: m }
     })
     // 每轮独立的打字机
     const typer = { target: '', timer: null, done: false }
@@ -178,12 +175,8 @@ export default function Chat({ open, agent, onClose }) {
     }
     const setTarget = (s) => { typer.target = s; pump() }
     const ctrl = new AbortController()
-    activeRef.current = { ctrl, typer }
-    // session id 也归本轮的 agent:切走后写回它的抽屉,不污染当前对话
-    const setSid = (sid) => {
-      if (keyRef.current === turnKey) sidRef.current = sid
-      else if (storeRef.current[turnKey]) storeRef.current[turnKey].sid = sid
-    }
+    runner(turnKey).active = { ctrl, typer }
+    const setSid = (sid) => patch(turnKey, (v) => ({ ...v, sid }))
     // acc = 本轮已定稿文本(工具调用会分多条 assistant 消息),streamed = 当前消息增量
     let acc = '', streamed = ''
     const seenTools = new Set()   // partial 快照会重复携带同一 tool_use,按 id 去重
@@ -192,7 +185,7 @@ export default function Chat({ open, agent, onClose }) {
       const r = await fetch('/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          message: text, sessionId: sidRef.current,
+          message: text, sessionId: convsRef.current[turnKey]?.sid || undefined,
           model: modelRef.current || undefined,
           permissionMode: permRef.current || undefined,
           agent: turnKey || undefined,
@@ -252,31 +245,53 @@ export default function Chat({ open, agent, onClose }) {
     typer.done = true
     if (typer.timer) { clearInterval(typer.timer); typer.timer = null }
     upd((x) => ({ ...x, text: typer.target, status: null, live: false }))
-    activeRef.current = null
+    runner(turnKey).active = null
   }
 
-  const drain = async () => {
-    if (runningRef.current) return
-    runningRef.current = true; setBusy(true)
-    while (queueRef.current.length) await runTurn(queueRef.current.shift())
-    runningRef.current = false; setBusy(false)
+  const drain = async (k) => {
+    const r = runner(k)
+    if (r.running) return
+    r.running = true
+    patch(k, (v) => ({ ...v, busy: true }))
+    while (r.queue.length) {
+      const text = r.queue.shift()
+      // 队列长度要先取值再进 patch:函数式更新是惰性执行的,晚了会读到已变动的队列
+      const queued = r.queue.length
+      patch(k, (v) => ({ ...v, queued }))
+      await runTurn(k, text)
+    }
+    r.running = false
+    patch(k, (v) => ({ ...v, busy: false, queued: 0 }))
   }
 
   const submit = () => {
     const text = input.trim()
     if (!text) return
     setInput(''); setStick(true)
-    setMsgs((m) => [...m, { role: 'user', text }])
-    queueRef.current.push(text)
-    drain()
+    patch(key, (v) => ({ ...v, agent: agent || v.agent, msgs: [...v.msgs, { role: 'user', text }] }))
+    runner(key).queue.push(text)
+    drain(key)
   }
 
-  const stop = () => activeRef.current?.ctrl.abort()
+  const stop = () => runner(key).active?.ctrl.abort()
 
   const reset = () => {
-    queueRef.current = []
-    activeRef.current?.ctrl.abort()
-    setMsgs([]); sidRef.current = null; setHist(null); inputRef.current?.focus()
+    const r = runner(key)
+    r.queue = []
+    r.active?.ctrl.abort()
+    patch(key, (v) => ({ ...v, msgs: [], sid: null }))
+    setHist(null)
+    inputRef.current?.focus()
+  }
+
+  // 被拒后的一键授权重试:切到「可编辑」,续会话让它补做刚才被拒的操作
+  const retryWithPerm = () => {
+    const v = 'acceptEdits'
+    setPerm(v); permRef.current = v; localStorage.setItem('chat-perm', v)
+    const text = '我已授权写入(可编辑文件),请继续完成刚才因权限被拒的操作。'
+    patch(key, (x) => ({ ...x, msgs: [...x.msgs, { role: 'user', text }] }))
+    runner(key).queue.push(text)
+    drain(key)
   }
 
   // 历史会话:🕘 展开当前 agent 的最近会话(后端每个 agent 最多记 10 条)
@@ -290,108 +305,114 @@ export default function Chat({ open, agent, onClose }) {
   // 选中历史会话:还原转录并 --resume 续聊;转录读不到也接上 session,只是不显示旧消息
   const pickSession = async (s) => {
     setHist(null)
-    queueRef.current = []
-    activeRef.current?.ctrl.abort()
-    sidRef.current = s.sid
+    const r = runner(key)
+    r.queue = []
+    r.active?.ctrl.abort()
+    let msgs
     try {
       const j = await (await fetch(`/api/chat/session?id=${encodeURIComponent(s.sid)}`)).json()
       if (!j.ok) throw new Error(j.error || '加载失败')
-      setMsgs(j.data.map((m) => (m.role === 'ai' ? { denied: [], ...m } : m)))
+      msgs = j.data.map((m) => (m.role === 'ai' ? { denied: [], ...m } : m))
     } catch (e) {
-      setMsgs([{ role: 'ai', text: `⚠️ 转录加载失败(${e.message}),已接上该会话,可直接继续对话。`, tools: [], denied: [] }])
+      msgs = [{ role: 'ai', text: `⚠️ 转录加载失败(${e.message}),已接上该会话,可直接继续对话。`, tools: [], denied: [] }]
     }
+    patch(key, (v) => ({ ...v, sid: s.sid, msgs }))
     setStick(true)
     inputRef.current?.focus()
   }
 
-  // 被拒后的一键授权重试:切到「可编辑」,续会话让它补做刚才被拒的操作
-  const retryWithPerm = () => {
-    const v = 'acceptEdits'
-    setPerm(v); permRef.current = v; localStorage.setItem('chat-perm', v)
-    const text = '我已授权写入(可编辑文件),请继续完成刚才因权限被拒的操作。'
-    setMsgs((m) => [...m, { role: 'user', text }])
-    queueRef.current.push(text)
-    drain()
-  }
-
-  const queued = queueRef.current.length
+  const tabs = Object.entries(convs)
 
   return (
     <aside className={`chat ${open ? 'open' : ''}`}>
-      <div className="chat-head">
-        <div className="chat-head-top">
-          <span className="chat-ava"><Ava icon={agent?.icon} /></span>
-          <b>{agent?.name || 'AI 对话'}</b>
-          <span className="chat-sub">{busy ? `思考中…${queued ? `(+${queued} 排队)` : ''}` : (sidRef.current ? '会话中' : '新会话')}</span>
-          {busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
-          <button className="chat-hbtn" title="历史会话" onClick={toggleHist}>🕘</button>
-          <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
-          <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
+      {tabs.length > 1 && (
+        <div className="chat-tabs">
+          {tabs.map(([k, v]) => (
+            <button key={k} className={`chat-tab ${k === key ? 'on' : ''}`}
+              title={k || 'AI 对话'}
+              onClick={() => { if (k !== key) onSwitch?.(v.agent) }}>
+              <Ava icon={v.agent?.icon} />
+              {v.busy && <i className="tab-busy" />}
+            </button>
+          ))}
         </div>
-        <div className="chat-opts">
-          <select className="chat-model" value={model} onChange={pickModel} title="切换模型(下一条生效)">
-            <option value="">sonnet · 默认</option>
-            <option value="haiku">haiku · 快</option>
-            <option value="opus">opus · 强</option>
-          </select>
-          <select className="chat-model" value={perm} onChange={pickPerm} title="写入授权(下一条生效)">
-            <option value="">🔒 只读 · 默认</option>
-            <option value="acceptEdits">✏️ 可编辑文件</option>
-            <option value="bypassPermissions">⚡ 全权限</option>
-          </select>
-        </div>
-        {hist && (
-          <div className="chat-hist">
-            {hist.length === 0 && <p className="hist-empty">暂无历史会话</p>}
-            {hist.map((s) => (
-              <button key={s.sid} className="hist-item" onClick={() => pickSession(s)}>
-                <span className="hist-title">{s.title || '(无标题)'}</span>
-                <span className="hist-time">{timeAgo(s.ts)}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="chat-body" ref={bodyRef} onScroll={onScroll}>
-        {msgs.length === 0 && (
-          agent?.prompt ? (
-            <div className="chat-hello">
-              <span className="hello-ava"><Ava icon={agent.icon} /></span>
-              <b>{agent.name}</b><br />{agent.summary}
-            </div>
-          ) : (
-            <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>
-          )
-        )}
-        {msgs.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>
-            {m.tools?.length > 0 && (
-              <span className="msg-tools">{groupTools(m.tools).map((t, j) => (
-                <i key={j}>🔧 {t.name}{t.count > 1 ? ` ×${t.count}` : t.hint ? <em> {t.hint}</em> : null}</i>
-              ))}</span>
-            )}
-            {m.role === 'ai'
-              ? <span className={`md ${m.live ? 'live' : ''}`} dangerouslySetInnerHTML={{ __html: mdHtml(m.text) }} />
-              : linkNodes(m.text)}
-            {m.denied?.length > 0 && (
-              <span className="msg-denied">
-                ⛔ {m.denied.join('、')} 需要写入授权,已被拒
-                {!m.live && <button onClick={retryWithPerm}>授权并重试</button>}
-              </span>
-            )}
-            {m.live && m.status && <span className="msg-status">{m.status}</span>}
-          </div>
-        ))}
-      </div>
-      {!stick && msgs.length > 0 && (
-        <button className="chat-down" title="回到最新" onClick={toLatest}>↓</button>
       )}
-      <div className="chat-input">
-        <textarea ref={inputRef} rows="1" value={input}
-          placeholder={busy ? '可以继续输入,回答完自动发出…' : '输入消息,Enter 发送'}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } }} />
-        <button className="chat-send" disabled={!input.trim()} onClick={submit}>↑</button>
+      <div className="chat-main">
+        <div className="chat-head">
+          <div className="chat-head-top">
+            <span className="chat-ava"><Ava icon={agent?.icon} /></span>
+            <b>{agent?.name || 'AI 对话'}</b>
+            <span className="chat-sub">{conv.busy ? `思考中…${conv.queued ? `(+${conv.queued} 排队)` : ''}` : (conv.sid ? '会话中' : '新会话')}</span>
+            {conv.busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
+            <button className="chat-hbtn" title="历史会话" onClick={toggleHist}>🕘</button>
+            <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
+            <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
+          </div>
+          <div className="chat-opts">
+            <select className="chat-model" value={model} onChange={pickModel} title="切换模型(下一条生效)">
+              <option value="">sonnet · 默认</option>
+              <option value="haiku">haiku · 快</option>
+              <option value="opus">opus · 强</option>
+            </select>
+            <select className="chat-model" value={perm} onChange={pickPerm} title="写入授权(下一条生效)">
+              <option value="">🔒 只读 · 默认</option>
+              <option value="acceptEdits">✏️ 可编辑文件</option>
+              <option value="bypassPermissions">⚡ 全权限</option>
+            </select>
+          </div>
+          {hist && (
+            <div className="chat-hist">
+              {hist.length === 0 && <p className="hist-empty">暂无历史会话</p>}
+              {hist.map((s) => (
+                <button key={s.sid} className="hist-item" onClick={() => pickSession(s)}>
+                  <span className="hist-title">{s.title || '(无标题)'}</span>
+                  <span className="hist-time">{timeAgo(s.ts)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="chat-body" ref={bodyRef} onScroll={onScroll}>
+          {conv.msgs.length === 0 && (
+            agent?.prompt ? (
+              <div className="chat-hello">
+                <span className="hello-ava"><Ava icon={agent.icon} /></span>
+                <b>{agent.name}</b><br />{agent.summary}
+              </div>
+            ) : (
+              <div className="chat-hello">和跑在 ~/.awesome-agent 里的 Claude 对话。<br />问项目、查登记簿、读文件都可以。</div>
+            )
+          )}
+          {conv.msgs.map((m, i) => (
+            <div key={i} className={`msg ${m.role}`}>
+              {m.tools?.length > 0 && (
+                <span className="msg-tools">{groupTools(m.tools).map((t, j) => (
+                  <i key={j}>🔧 {t.name}{t.count > 1 ? ` ×${t.count}` : t.hint ? <em> {t.hint}</em> : null}</i>
+                ))}</span>
+              )}
+              {m.role === 'ai'
+                ? <span className={`md ${m.live ? 'live' : ''}`} dangerouslySetInnerHTML={{ __html: mdHtml(m.text) }} />
+                : linkNodes(m.text)}
+              {m.denied?.length > 0 && (
+                <span className="msg-denied">
+                  ⛔ {m.denied.join('、')} 需要写入授权,已被拒
+                  {!m.live && <button onClick={retryWithPerm}>授权并重试</button>}
+                </span>
+              )}
+              {m.live && m.status && <span className="msg-status">{m.status}</span>}
+            </div>
+          ))}
+        </div>
+        {!stick && conv.msgs.length > 0 && (
+          <button className="chat-down" title="回到最新" onClick={toLatest}>↓</button>
+        )}
+        <div className="chat-input">
+          <textarea ref={inputRef} rows="1" value={input}
+            placeholder={conv.busy ? '可以继续输入,回答完自动发出…' : '输入消息,Enter 发送'}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } }} />
+          <button className="chat-send" disabled={!input.trim()} onClick={submit}>↑</button>
+        </div>
       </div>
     </aside>
   )

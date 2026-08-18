@@ -252,7 +252,8 @@ export default function App() {
               onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')} /></label>
         </div>
       )}
-      <Chat open={chatOpen} agent={chatAgent} onClose={() => setChatOpen(false)} />
+      <Chat open={chatOpen} agent={chatAgent} onClose={() => setChatOpen(false)}
+        onSwitch={(a) => { setChatAgent(a); setChatOpen(true) }} />
       <button className="fab chat-btn" title="AI 对话"
         onClick={() => { if (chatOpen) { setChatOpen(false) } else { setChatAgent(null); setChatOpen(true) } }}>✨</button>
     </>
