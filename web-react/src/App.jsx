@@ -247,15 +247,14 @@ export default function App() {
             <input type="checkbox" checked={!prefs.noPop} onChange={() => togglePref('noPop')} /></label>
           <label className="setrow">桌面宠物
             <input type="checkbox" checked={!prefs.noPet} onChange={() => togglePref('noPet')} /></label>
+          <label className="setrow">暗色模式
+            <input type="checkbox" checked={theme === 'dark'}
+              onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')} /></label>
         </div>
       )}
       <Chat open={chatOpen} agent={chatAgent} onClose={() => setChatOpen(false)} />
       <button className="fab chat-btn" title="AI 对话"
         onClick={() => { if (chatOpen) { setChatOpen(false) } else { setChatAgent(null); setChatOpen(true) } }}>✨</button>
-      <button className="fab theme-btn" title="切换亮暗模式"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
     </>
   )
 }

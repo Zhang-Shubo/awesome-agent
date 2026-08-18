@@ -107,7 +107,6 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
   color: var(--text);
 }
 .chat-btn { right: 24px; top: 24px; }
-.theme-btn { left: 24px; bottom: 24px; }
 .set-btn { left: 24px; top: 24px; }
 
 /* 设置弹层:左上角 ⚙️ 下方的小玻璃卡 */
