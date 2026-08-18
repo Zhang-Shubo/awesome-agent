@@ -255,7 +255,12 @@ export default function App() {
       <Chat open={chatOpen} agent={chatAgent} onClose={() => setChatOpen(false)}
         onSwitch={(a) => { setChatAgent(a); setChatOpen(true) }} />
       <button className="fab chat-btn" title="AI 对话"
-        onClick={() => { if (chatOpen) { setChatOpen(false) } else { setChatAgent(null); setChatOpen(true) } }}>✨</button>
+        onClick={() => {
+          if (chatOpen) return setChatOpen(false)
+          // 默认对话就是本机 claude,与登记簿的 claude-code 是同一身份:有该条目就用它(图标/名字一致)
+          setChatAgent(agents.find((a) => a.name === 'claude-code') || null)
+          setChatOpen(true)
+        }}>✨</button>
     </>
   )
 }
