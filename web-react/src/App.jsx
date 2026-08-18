@@ -118,7 +118,8 @@ export default function App() {
   const [editing, setEditing] = useState(false)
   const [adding, setAdding] = useState(null)   // null | 'apps' | 'agents'
   const [chatOpen, setChatOpen] = useState(false)
-  const [chatAgent, setChatAgent] = useState(null)   // null = 默认 Claude;点 agent 瓷贴则以其身份对话
+  // 对话默认就是 claude-code 身份(登记条目加载前先用同名占位,不存在独立的「默认对话」);点 agent 瓷贴则以其身份对话
+  const [chatAgent, setChatAgent] = useState({ name: 'claude-code', icon: '/icons/claude-code.svg' })
   // 偏好:noPop 关掉悬浮简介,noPet 关掉宠物;存 localStorage
   const [prefs, setPrefs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('panel-prefs')) || {} } catch { return {} }
@@ -257,8 +258,7 @@ export default function App() {
       <button className="fab chat-btn" title="AI 对话"
         onClick={() => {
           if (chatOpen) return setChatOpen(false)
-          // 默认对话就是本机 claude,与登记簿的 claude-code 是同一身份:有该条目就用它(图标/名字一致)
-          setChatAgent(agents.find((a) => a.name === 'claude-code') || null)
+          setChatAgent(agents.find((a) => a.name === 'claude-code') || chatAgent)
           setChatOpen(true)
         }}>✨</button>
     </>

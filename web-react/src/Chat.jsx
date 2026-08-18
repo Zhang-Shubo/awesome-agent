@@ -329,7 +329,7 @@ export default function Chat({ open, agent, onClose, onSwitch }) {
         <div className="chat-tabs">
           {tabs.map(([k, v]) => (
             <button key={k} className={`chat-tab ${k === key ? 'on' : ''}`}
-              title={k || 'AI 对话'}
+              title={k}
               onClick={() => { if (k !== key) onSwitch?.(v.agent) }}>
               <Ava icon={v.agent?.icon} />
               {v.busy && <i className="tab-busy" />}
@@ -341,7 +341,7 @@ export default function Chat({ open, agent, onClose, onSwitch }) {
         <div className="chat-head">
           <div className="chat-head-top">
             <span className="chat-ava"><Ava icon={agent?.icon} /></span>
-            <b>{agent?.name || 'AI 对话'}</b>
+            <b>{agent?.name}</b>
             <span className="chat-sub">{conv.busy ? `思考中…${conv.queued ? `(+${conv.queued} 排队)` : ''}` : (conv.sid ? '会话中' : '新会话')}</span>
             {conv.busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
             <button className="chat-hbtn" title="历史会话" onClick={toggleHist}>🕘</button>
