@@ -1,0 +1,12 @@
+{
+  "name": "agent 面板",
+  "short_name": "agent",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#f6f7fb",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

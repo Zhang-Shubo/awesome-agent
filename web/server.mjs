@@ -162,7 +162,7 @@ const readBody = (req) => new Promise((resolve) => {
   req.on('end', () => resolve(s))
 })
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json' }
 
 // 小组件数据缓存(name → { at, data }):60s 内直接回缓存,护住各 app 上游
 const widgetCache = new Map()
