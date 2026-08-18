@@ -16,13 +16,13 @@ const repoUrl = (r) => {
 // 图标既可以是 emoji,也可以是图片地址(项目自带的 favicon);图片加载失败退回 emoji
 const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
 
-function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, showPop = true, children }) {
+function Tile({ icon, fallback, name, href, editing, onDelete, onOpen, showPop = true, dragProps, children }) {
   // onOpen 优先于 href:agent 瓷贴点击打开对话侧栏,仓库链接挪进悬浮详情
   const Tag = href && !editing && !onOpen ? 'a' : 'div'
   // 点击进入后悬浮详情立即收起(纯 :hover 收不掉,点完鼠标还停在瓷贴上),移开鼠标后恢复
   const [popHidden, setPopHidden] = useState(false)
   return (
-    <Tag className="tile" onMouseLeave={() => setPopHidden(false)}
+    <Tag className="tile" {...dragProps} onMouseLeave={() => setPopHidden(false)}
       onClick={() => { setPopHidden(true); if (!editing && onOpen) onOpen() }}
       {...(href && !editing && !onOpen ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}>
       {editing && (
@@ -50,9 +50,9 @@ const relTime = (iso) => {
   return h < 24 ? `${h} 小时前` : `${Math.round(h / 24)} 天前`
 }
 
-function Widget({ w }) {
+function Widget({ w, dragProps }) {
   return (
-    <div className="widget">
+    <div className="widget" {...dragProps}>
       <div className="widget-head">
         <span className="widget-ico">{isImgIcon(w.icon) ? <img src={w.icon} alt="" /> : (w.icon || '📦')}</span>
         <b>{w.title}</b>
@@ -247,16 +247,37 @@ export default function App() {
     reload()
   }
 
+  // 拖动排序(编辑模式下,App/Agent 瓷贴与 Widget 卡片通用):HTML5 DnD,拖入别的条目时实时换位,
+  // 松手把该分组的 name 顺序 POST /api/order 持久化(存面板机,跨设备生效)
+  const dragRef = useRef(null)   // { kind, index }
+  const arrMove = (arr, from, to) => { const a = arr.slice(); const [x] = a.splice(from, 1); a.splice(to, 0, x); return a }
+  const saveOrder = (kind, list) =>
+    fetch('/api/order', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [kind]: list.map((x) => x.name) }) }).catch(() => {})
+  const dragProps = (kind, setItems, i) => editing ? {
+    draggable: true,
+    onDragStart: (e) => { dragRef.current = { kind, index: i }; e.dataTransfer.effectAllowed = 'move' },
+    onDragOver: (e) => {
+      e.preventDefault()
+      const d = dragRef.current
+      if (!d || d.kind !== kind || d.index === i) return
+      setItems((cur) => arrMove(cur, d.index, i))
+      d.index = i
+    },
+    onDragEnd: () => { setItems((cur) => { saveOrder(kind, cur); return cur }); dragRef.current = null },
+  } : undefined
+
+  const setterOf = { apps: setApps, agents: setAgents }
   const group = (kind, title, items, renderPop, fallbackIcon, onOpen) => (
     <section>
       <h2>{title}</h2>
       {items.length || editing ? (
         <div className={`launcher ${editing ? 'editing' : ''}`}>
-          {items.map((it) => (
+          {items.map((it, i) => (
             <Tile key={it.name} icon={it.icon || fallbackIcon(it)} fallback={fallbackIcon(it)} name={it.name}
               href={it.url || (it.repo && repoUrl(it.repo))}
               editing={editing} onDelete={() => del(kind, it.name)}
-              onOpen={onOpen && (() => onOpen(it))} showPop={!prefs.noPop}>
+              onOpen={onOpen && (() => onOpen(it))} showPop={!prefs.noPop}
+              dragProps={dragProps(kind, setterOf[kind], i)}>
               {renderPop(it)}
             </Tile>
           ))}
@@ -298,7 +319,9 @@ export default function App() {
         {widgets.length > 0 && !prefs.noWidget && (
           <section>
             <h2>Widget</h2>
-            <div className="widgets">{widgets.map((w) => <Widget key={w.name} w={w} />)}</div>
+            <div className={`widgets ${editing ? 'editing' : ''}`}>
+              {widgets.map((w, i) => <Widget key={w.name} w={w} dragProps={dragProps('widgets', setWidgets, i)} />)}
+            </div>
           </section>
         )}
       </div>

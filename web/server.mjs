@@ -95,11 +95,19 @@ function mergeEntries(dirs) {
   // hidden 墓碑:私有条目可把同名公共条目从面板隐藏(不动公共库)
   return [...map.values()].filter((e) => !e.hidden).sort((a, b) => a.name.localeCompare(b.name))
 }
-const apps = () => mergeEntries([REGISTRY, PRIVATE_REGISTRY])
-const agents = () => mergeEntries([
+// 拖动排序:顺序存 AGENT_ROOT/.panel-order.json({apps:[name],agents:[],widgets:[]},私有不入库);
+// 未登记进顺序表的条目(新增的)排在已排序条目之后,按名字兜底
+const ORDER_FILE = () => path.join(AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT, '.panel-order.json')
+const readOrder = () => { try { return JSON.parse(fs.readFileSync(ORDER_FILE(), 'utf8')) } catch { return {} } }
+const orderBy = (list, key) => {
+  const pos = new Map((readOrder()[key] || []).map((n, i) => [n, i]))
+  return list.slice().sort((a, b) => ((pos.get(a.name) ?? 1e9) - (pos.get(b.name) ?? 1e9)) || a.name.localeCompare(b.name))
+}
+const apps = () => orderBy(mergeEntries([REGISTRY, PRIVATE_REGISTRY]), 'apps')
+const agents = () => orderBy(mergeEntries([
   path.join(REGISTRY, 'agents'),
   PRIVATE_REGISTRY && path.join(PRIVATE_REGISTRY, 'agents'),
-])
+]), 'agents')
 
 // 登记文件生成(写入私有登记簿用)
 function entryMd(b) {
@@ -199,10 +207,23 @@ http.createServer(async (req, res) => {
       return send(200, { ok: true })
     }
   }
+  // 拖动排序持久化:前端拖完 POST 各分组的 name 顺序,GET 供调试
+  if (url.pathname === '/api/order') {
+    if (req.method === 'GET') return send(200, { ok: true, data: readOrder() })
+    if (req.method === 'POST') {
+      let b
+      try { b = JSON.parse(await readBody(req)) } catch { return send(400, { ok: false, error: 'JSON 解析失败' }) }
+      const cur = readOrder()
+      for (const k of ['apps', 'agents', 'widgets'])
+        if (Array.isArray(b[k])) cur[k] = b[k].filter((x) => typeof x === 'string').slice(0, 200)
+      try { fs.writeFileSync(ORDER_FILE(), JSON.stringify(cur)) } catch (e) { return send(500, { ok: false, error: String(e.message || e) }) }
+      return send(200, { ok: true })
+    }
+  }
   // 小组件:代理登记簿声明的 widget-api(只代理登记的 URL,不接受客户端指定;内网地址不出后端)。
   // 失败如实返回 {ok:false,error} 由前端原样展示,不编造、不丢弃。
   if (url.pathname === '/api/widgets' && req.method === 'GET') {
-    const list = apps().filter((e) => e.widgetApi)
+    const list = orderBy(apps().filter((e) => e.widgetApi), 'widgets')
     const data = await Promise.all(list.map(async (e) => {
       const base = { name: e.name, icon: e.icon, title: e.widgetTitle || e.name, link: e.widgetLink || e.url }
       const hit = widgetCache.get(e.name)

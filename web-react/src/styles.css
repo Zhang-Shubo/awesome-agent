@@ -378,3 +378,8 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 .widget-err { font-size: 12px; color: var(--muted); padding: 6px 4px; }
 .widget-more { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--muted); text-decoration: none; }
 .widget-more:hover { color: var(--text); }
+
+/* 编辑模式下小组件可拖动排序:内部链接暂时失效防误点,卡片给抓取光标与虚线框提示 */
+.widgets.editing .widget { cursor: grab; outline: 2px dashed var(--hairline); outline-offset: 4px; }
+.widgets.editing .widget a { pointer-events: none; }
+.launcher.editing .tile { cursor: grab; }
