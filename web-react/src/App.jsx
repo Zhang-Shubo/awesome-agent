@@ -75,6 +75,26 @@ function Widget({ w, dragProps }) {
   )
 }
 
+// 手机 PWA 内打开 app:standalone 模式下跳外域会弹出带地址栏的浏览器壳,
+// 改在面板里全屏 iframe 承载(自家服务都允许被 iframe),顶部细返回栏,↗ 兜底跳浏览器
+function AppShell({ app, onClose }) {
+  return (
+    <div className="appshell">
+      <div className="appshell-bar">
+        <button className="appshell-back" title="返回面板" onClick={onClose}>←</button>
+        <span className="appshell-title">
+          <span className="appshell-ico">
+            {isImgIcon(app.icon) ? <img src={app.icon} alt="" /> : (app.icon || '📦')}
+          </span>
+          {app.name}
+        </span>
+        <a className="appshell-ext" href={app.url} target="_blank" rel="noopener noreferrer" title="在浏览器打开">↗</a>
+      </div>
+      <iframe className="appshell-frame" src={app.url} title={app.name} />
+    </div>
+  )
+}
+
 function AddForm({ kind, onClose, onSaved }) {
   const isAgent = kind === 'agents'
   const [f, setF] = useState({ link: '', name: '', icon: '', repo: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
@@ -160,6 +180,20 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('panel-prefs')) || {} } catch { return {} }
   })
   const [setsOpen, setSetsOpen] = useState(false)
+  // 手机(≤640px):APP 瓷贴改为面板内 iframe 打开(见 AppShell);桌面仍新窗口
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 640px)').matches)
+  const [openedApp, setOpenedApp] = useState(null)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const h = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  // 有服务地址的进 iframe 壳;只有仓库链接的(github 拒绝被 iframe)仍开新窗口
+  const openApp = (it) => {
+    if (it.url) setOpenedApp(it)
+    else if (it.repo) window.open(repoUrl(it.repo), '_blank', 'noopener')
+  }
   const togglePref = (k) => setPrefs((p) => {
     const n = { ...p, [k]: !p[k] }
     localStorage.setItem('panel-prefs', JSON.stringify(n))
@@ -202,7 +236,7 @@ export default function App() {
     if (!chatOpen) return
     const h = (e) => {
       if (e.button !== 0) return
-      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, .widget, a, button, input, select, textarea')) return
+      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, .widget, .appshell, a, button, input, select, textarea')) return
       setChatOpen(false)
     }
     document.addEventListener('mousedown', h)
@@ -216,7 +250,7 @@ export default function App() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
-      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, .widget, a, button, input, select, textarea')
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, .widget, .appshell, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
       if (editingRef.current || !blank(e)) return
@@ -304,7 +338,7 @@ export default function App() {
               <span className={`status ${p.status}`}><i />{STATUS[p.status] || p.status}</span></p>
             {p.summary && <p className="pop-body">{p.summary}</p>}
           </>
-        ), () => '📦')}
+        ), () => '📦', isMobile ? openApp : undefined)}
         {group('agents', 'Agent', agents, (a) => (
           <>
             <p className="pop-title">{a.name}
@@ -325,6 +359,7 @@ export default function App() {
           </section>
         )}
       </div>
+      {openedApp && <AppShell app={openedApp} onClose={() => setOpenedApp(null)} />}
       {!prefs.noPet && <Pet />}
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}
