@@ -9,11 +9,22 @@ import { useEffect, useRef, useState } from 'react'
 // 极简 markdown → html(先转义再上标记,安全):#标题 / -与1.列表 / |表格| / >引用 / ---
 // / ```代码块 / **粗** / `码` / [链接](url)。与 fin-jargon 的渲染器同族。
 const escMd = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+// 裸 URL 识别:到空白/尖括号/中日文与全角标点为止;结尾的英文标点不算进链接
+const BARE_URL = /https?:\/\/[^\s<>　-〿一-鿿＀-￯]+/g
+const trimUrl = (u) => u.replace(/[),.;:!?'"]+$/, '')
 function mdHtml(src) {
-  const inline = (s) => escMd(s)
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+  const mkA = (url, txt) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${txt}</a>`
+  // 链接先收进占位槽再做其余替换,避免 href 里的内容被粗体/裸 URL 规则二次改写
+  const inline = (s) => {
+    const slots = []
+    const stash = (html) => `\x00${slots.push(html) - 1}\x00`
+    return escMd(s)
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_, t, u) => stash(mkA(u, t)))
+      .replace(BARE_URL, (u) => { const url = trimUrl(u); return stash(mkA(url, url)) + u.slice(url.length) })
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\x00(\d+)\x00/g, (_, i) => slots[i])
+  }
   let out = '', list = false, table = null, fence = null
   const closeList = () => { if (list) { out += '</ul>'; list = false } }
   const closeTable = () => {
@@ -66,6 +77,12 @@ const groupTools = (tools) => {
   }
   return order
 }
+
+// 用户消息是纯文本渲染,这里把其中的 URL 拆成可点击的 <a> 节点(不经 HTML 注入)
+const linkNodes = (text) => String(text).split(new RegExp(`(${BARE_URL.source})`)).map((part, i) =>
+  i % 2
+    ? <a key={i} href={trimUrl(part)} target="_blank" rel="noopener noreferrer">{part}</a>
+    : part)
 
 // 历史会话时间戳 → 「x 分钟前」式相对时间
 const timeAgo = (ts) => {
@@ -355,7 +372,7 @@ export default function Chat({ open, agent, onClose }) {
             )}
             {m.role === 'ai'
               ? <span className={`md ${m.live ? 'live' : ''}`} dangerouslySetInnerHTML={{ __html: mdHtml(m.text) }} />
-              : m.text}
+              : linkNodes(m.text)}
             {m.denied?.length > 0 && (
               <span className="msg-denied">
                 ⛔ {m.denied.join('、')} 需要写入授权,已被拒

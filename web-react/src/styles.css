@@ -196,6 +196,7 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 .md ul { margin: 4px 0; padding-left: 18px; }
 .md li { margin: 2px 0; }
 .md a { color: #6366f1; text-decoration: none; border-bottom: 1px solid rgba(99, 102, 241, 0.35); }
+.msg.user a { color: #6366f1; text-decoration: none; border-bottom: 1px solid rgba(99, 102, 241, 0.35); word-break: break-all; }
 .md code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
   background: rgba(99, 102, 241, 0.1); border-radius: 5px; padding: 1px 5px;
