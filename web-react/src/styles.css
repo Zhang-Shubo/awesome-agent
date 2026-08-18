@@ -25,6 +25,7 @@
   --blob-a: #312e81; --blob-b: #701a4d; --blob-c: #164e63;
 }
 * { box-sizing: border-box; margin: 0; }
+html, body { overflow-x: hidden; }   /* 悬浮详情等绝对定位盒可能超出视口,禁掉横向滚动/晃动 */
 body {
   background: var(--bg); color: var(--text);
   font: 500 16px/1.5 Inter, -apple-system, "PingFang SC", system-ui, sans-serif;
@@ -332,4 +333,27 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 .chat-model {
   border: 1px solid var(--glass-border); background: var(--glass); color: var(--muted);
   border-radius: 999px; font-size: 11px; padding: 3px 8px; outline: none; cursor: pointer; max-width: 118px;
+}
+
+/* ===== 手机适配(≤640px):悬浮按钮沉底、对话全屏、页面不横向晃动 ===== */
+@media (max-width: 640px) {
+  .shell { padding: 28px 20px calc(96px + env(safe-area-inset-bottom)); }
+  section + section { margin-top: 40px; }
+  .launcher { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 22px 10px; }
+
+  /* 悬浮按钮沉底:⚙️ 左下、✨ 右下,避开 iOS 底部小白条 */
+  .set-btn { left: 20px; top: auto; bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .chat-btn { right: 20px; top: auto; bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .setpop { left: 20px; top: auto; bottom: calc(78px + env(safe-area-inset-bottom)); }
+
+  /* 触屏没有悬浮态,详情浮层整个关掉(300px 浮层伸出视口也是横向晃动的来源) */
+  .pop { display: none; }
+
+  /* 对话抽屉 → 全屏 */
+  .chat { width: 100%; border-left: none; }
+  .chat-input { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .chat-down { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+  /* iOS:输入框字号 <16px 聚焦会整页自动放大,统一提到 16px */
+  .chat-input textarea, .field input, .field select, .field textarea { font-size: 16px; }
 }
