@@ -297,7 +297,7 @@ export default function App() {
         (a) => { setChatAgent(a); setChatOpen(true) })}
         {widgets.length > 0 && !prefs.noWidget && (
           <section>
-            <h2>小组件</h2>
+            <h2>widget</h2>
             <div className="widgets">{widgets.map((w) => <Widget key={w.name} w={w} />)}</div>
           </section>
         )}
