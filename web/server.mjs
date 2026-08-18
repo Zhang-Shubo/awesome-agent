@@ -166,6 +166,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': '
 
 // 小组件数据缓存(name → { at, data }):60s 内直接回缓存,护住各 app 上游
 const widgetCache = new Map()
+const colorCache = new Map()
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
@@ -241,6 +242,25 @@ http.createServer(async (req, res) => {
       return { ...base, ...d }
     }))
     return send(200, { ok: true, data, asOf: new Date().toISOString() })
+  }
+  // app 主题色:抓登记 app 首页的 <meta name="theme-color">,手机 app 壳用它把 iOS 状态栏
+  // 条带染成与 app 一致的颜色。只探测登记簿里的入口 URL,1 小时缓存;没有该 meta 的如实返回空。
+  if (url.pathname === '/api/appcolor' && req.method === 'GET') {
+    const name = url.searchParams.get('name') || ''
+    const app = apps().find((e) => e.name === name && /^https?:\/\//.test(e.url || ''))
+    if (!app) return send(404, { ok: false, error: '无此 app 或无入口 URL' })
+    const hit = colorCache.get(name)
+    if (hit && Date.now() - hit.at < 3600_000) return send(200, { ok: true, data: hit.data })
+    const d = { color: '' }
+    try {
+      const r = await fetch(app.url, { signal: AbortSignal.timeout(5000) })
+      const html = (await r.text()).slice(0, 65536)
+      const m = html.match(/<meta[^>]+name=["']theme-color["'][^>]*content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*name=["']theme-color["']/i)
+      if (m) d.color = m[1].trim().slice(0, 32)
+    } catch { /* 抓不到就空着,前端不换色 */ }
+    colorCache.set(name, { at: Date.now(), data: d })
+    return send(200, { ok: true, data: d })
   }
   if (url.pathname === '/api/config') {
     const cfg = Object.fromEntries(SAFE_KEYS.map(k => [k, readEnv(k) || '']).filter(([, v]) => v))

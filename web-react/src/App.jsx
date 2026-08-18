@@ -76,11 +76,35 @@ function Widget({ w, dragProps }) {
 }
 
 // 手机 PWA 内打开 app:standalone 模式下跳外域会弹出带地址栏的浏览器壳,
-// 改在面板里全屏 iframe 承载(自家服务都允许被 iframe),右下角一颗小悬浮 ✕ 收回
+// 改在面板里全屏 iframe 承载(自家服务都允许被 iframe),右上角一颗悬浮 ✕ 收回。
+// iOS 状态栏条带的颜色取自面板的 theme-color/页面背景,iframe 管不到——壳打开时
+// 把它们临时换成该 app 自己的主题色(服务端 /api/appcolor 探测),关闭时还原。
 function AppShell({ app, onClose }) {
+  const [bg, setBg] = useState('')
+  useEffect(() => {
+    let on = true
+    fetch(`/api/appcolor?name=${encodeURIComponent(app.name)}`)
+      .then((r) => r.json())
+      .then((d) => { if (on && d.ok && d.data.color) setBg(d.data.color) })
+      .catch(() => {})
+    return () => { on = false }
+  }, [app.name])
+  useEffect(() => {
+    if (!bg) return
+    const html = document.documentElement
+    const meta = document.querySelector('meta[name="theme-color"]')
+    const prev = { bg: html.style.backgroundColor, meta: meta?.getAttribute('content') }
+    html.style.backgroundColor = bg
+    meta?.setAttribute('content', bg)
+    return () => {
+      html.style.backgroundColor = prev.bg
+      if (prev.meta) meta?.setAttribute('content', prev.meta)
+    }
+  }, [bg])
   return (
-    <div className="appshell">
-      <iframe className="appshell-frame" src={app.url} title={app.name} />
+    <div className="appshell" style={bg ? { background: bg } : undefined}>
+      <iframe className="appshell-frame" src={app.url} title={app.name}
+        style={bg ? { background: bg } : undefined} />
       <button className="appshell-close" title="返回面板" onClick={onClose}>✕</button>
     </div>
   )
