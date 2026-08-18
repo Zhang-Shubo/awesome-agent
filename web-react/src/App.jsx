@@ -75,46 +75,6 @@ function Widget({ w, dragProps }) {
   )
 }
 
-// 手机 PWA 内打开 app:standalone 模式下跳外域会弹出带地址栏的浏览器壳,
-// 改在面板里全屏 iframe 承载(自家服务都允许被 iframe),右上角一颗悬浮 ✕ 收回。
-// iOS 状态栏条带的颜色取自面板的 theme-color/页面背景,iframe 管不到——壳打开时
-// 把它们临时换成该 app 自己的主题色(服务端 /api/appcolor 探测),关闭时还原。
-function AppShell({ app, onClose }) {
-  const [bg, setBg] = useState('')
-  useEffect(() => {
-    let on = true
-    fetch(`/api/appcolor?name=${encodeURIComponent(app.name)}`)
-      .then((r) => r.json())
-      .then((d) => { if (on && d.ok && d.data.color) setBg(d.data.color) })
-      .catch(() => {})
-    return () => { on = false }
-  }, [app.name])
-  useEffect(() => {
-    if (!bg) return
-    // iOS 26 起 Safari 忽略 theme-color meta,状态栏颜色实时取自视口顶部元素/body 的背景色
-    // (https://x.com/dannymoerkerke/status/1995944519632912570)——html/body/meta 一起换,新旧系统都覆盖
-    const html = document.documentElement
-    const body = document.body
-    const meta = document.querySelector('meta[name="theme-color"]')
-    const prev = { html: html.style.backgroundColor, body: body.style.backgroundColor, meta: meta?.getAttribute('content') }
-    html.style.backgroundColor = bg
-    body.style.backgroundColor = bg
-    meta?.setAttribute('content', bg)
-    return () => {
-      html.style.backgroundColor = prev.html
-      body.style.backgroundColor = prev.body
-      if (prev.meta) meta?.setAttribute('content', prev.meta)
-    }
-  }, [bg])
-  return (
-    <div className="appshell" style={bg ? { background: bg } : undefined}>
-      <iframe className="appshell-frame" src={app.url} title={app.name}
-        style={bg ? { background: bg } : undefined} />
-      <button className="appshell-close" title="返回面板" onClick={onClose}>✕</button>
-    </div>
-  )
-}
-
 function AddForm({ kind, onClose, onSaved }) {
   const isAgent = kind === 'agents'
   const [f, setF] = useState({ link: '', name: '', icon: '', repo: '', summary: '', status: 'active', agentKind: 'interactive', entry: '' })
@@ -200,20 +160,6 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('panel-prefs')) || {} } catch { return {} }
   })
   const [setsOpen, setSetsOpen] = useState(false)
-  // 手机(≤640px):APP 瓷贴改为面板内 iframe 打开(见 AppShell);桌面仍新窗口
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 640px)').matches)
-  const [openedApp, setOpenedApp] = useState(null)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)')
-    const h = () => setIsMobile(mq.matches)
-    mq.addEventListener('change', h)
-    return () => mq.removeEventListener('change', h)
-  }, [])
-  // 有服务地址的进 iframe 壳;只有仓库链接的(github 拒绝被 iframe)仍开新窗口
-  const openApp = (it) => {
-    if (it.url) setOpenedApp(it)
-    else if (it.repo) window.open(repoUrl(it.repo), '_blank', 'noopener')
-  }
   const togglePref = (k) => setPrefs((p) => {
     const n = { ...p, [k]: !p[k] }
     localStorage.setItem('panel-prefs', JSON.stringify(n))
@@ -256,7 +202,7 @@ export default function App() {
     if (!chatOpen) return
     const h = (e) => {
       if (e.button !== 0) return
-      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, .widget, .appshell, a, button, input, select, textarea')) return
+      if (e.target.closest('.chat, .fab, .tile, .modal, .overlay, .pop, .setpop, .pet, .widget, a, button, input, select, textarea')) return
       setChatOpen(false)
     }
     document.addEventListener('mousedown', h)
@@ -270,7 +216,7 @@ export default function App() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => {
     const blank = (e) => e.button === 0 &&
-      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, .widget, .appshell, a, button, input, select, textarea')
+      !e.target.closest('.tile, .fab, .modal, .overlay, .pop, .empty, .pet, .chat, .setpop, .widget, a, button, input, select, textarea')
     let timer, sx, sy, fired = false
     const down = (e) => {
       if (editingRef.current || !blank(e)) return
@@ -358,7 +304,7 @@ export default function App() {
               <span className={`status ${p.status}`}><i />{STATUS[p.status] || p.status}</span></p>
             {p.summary && <p className="pop-body">{p.summary}</p>}
           </>
-        ), () => '📦', isMobile ? openApp : undefined)}
+        ), () => '📦')}
         {group('agents', 'Agent', agents, (a) => (
           <>
             <p className="pop-title">{a.name}
@@ -379,7 +325,6 @@ export default function App() {
           </section>
         )}
       </div>
-      {openedApp && <AppShell app={openedApp} onClose={() => setOpenedApp(null)} />}
       {!prefs.noPet && <Pet />}
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)}
         onSaved={() => { setAdding(null); reload() }} />}

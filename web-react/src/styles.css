@@ -335,23 +335,6 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
   border-radius: 999px; font-size: 11px; padding: 3px 8px; outline: none; cursor: pointer; max-width: 118px;
 }
 
-/* 手机 PWA 内的 app 壳:iframe 全屏满铺(不留安全区色带,颜色全由 app 页面自己说了算)
-   + 右上角悬浮 ✕(只在 ≤640px 由 APP 瓷贴触发;按钮自己避开状态栏) */
-.appshell {
-  position: fixed; inset: 0; z-index: 50;
-  display: flex; flex-direction: column; background: var(--bg);
-}
-.appshell-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
-.appshell-close {
-  position: absolute; right: 12px; top: calc(10px + env(safe-area-inset-top));
-  width: 38px; height: 38px; border-radius: 50%;
-  border: 1px solid var(--glass-border); background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%);
-  color: var(--muted); font-size: 16px; cursor: pointer; opacity: 0.9;
-  box-shadow: var(--shadow);
-  display: flex; align-items: center; justify-content: center;
-}
-
 /* ===== 手机适配(≤640px):悬浮按钮沉底、对话全屏、页面不横向晃动 ===== */
 @media (max-width: 640px) {
   .shell { padding: 28px 20px calc(96px + env(safe-area-inset-bottom)); }
