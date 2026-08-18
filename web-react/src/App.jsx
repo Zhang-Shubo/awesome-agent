@@ -181,13 +181,15 @@ export default function App() {
 
   useEffect(() => { reload() }, [])
 
-  // 小组件:进页拉一次,之后 5 分钟一轮(面板是启动台不是监控台);页面在后台时跳过
+  // 小组件:进页拉一次,之后 5 分钟一轮(面板是启动台不是监控台);页面在后台时跳过,
+  // 切回前台立即补拉(后台标签页里首次加载会错过首拉;服务端有 60s 缓存,不会打穿上游)
   const [widgets, setWidgets] = useState([])
   useEffect(() => {
     const pull = () => { if (!document.hidden) fetch('/api/widgets').then((r) => r.json()).then((d) => setWidgets(d.data || [])).catch(() => {}) }
     pull()
     const t = setInterval(pull, 300_000)
-    return () => clearInterval(t)
+    document.addEventListener('visibilitychange', pull)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', pull) }
   }, [])
 
   useEffect(() => {
