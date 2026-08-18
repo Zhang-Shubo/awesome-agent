@@ -127,6 +127,22 @@ async function resolveLink(link) {
   r.name = String(r.name || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
   return r
 }
+// 会话历史:按 agent 记最近 10 个会话(存私有的 AGENT_ROOT 下,不进公共库)。
+// 每轮 -p --resume 都会派生新 session_id,所以续聊时用旧 id 找到条目原位替换,不产生重复。
+const CHAT_CWD = () => (AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT)
+const HIST_FILE = () => path.join(CHAT_CWD(), '.chat-history.json')
+const readHist = () => { try { return JSON.parse(fs.readFileSync(HIST_FILE(), 'utf8')) } catch { return {} } }
+function recordSession(agentKey, sid, prevSid, title) {
+  const h = readHist()
+  const list = h[agentKey] || []
+  const old = prevSid ? list.find((e) => e.sid === prevSid) : null
+  h[agentKey] = [
+    { sid, title: old?.title || title, ts: Date.now() },
+    ...list.filter((e) => e.sid !== sid && e.sid !== prevSid),
+  ].slice(0, 10)
+  try { fs.writeFileSync(HIST_FILE(), JSON.stringify(h)) } catch { /* 历史丢失不影响对话 */ }
+}
+
 const readBody = (req) => new Promise((resolve) => {
   let s = ''
   req.on('data', (c) => { s += c })
@@ -179,6 +195,37 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
     return res.end(JSON.stringify({ ok: true, data: cfg }))
   }
+  // 某 agent 的历史会话列表(最多 10 条,新的在前)
+  if (url.pathname === '/api/chat/history' && req.method === 'GET') {
+    return send(200, { ok: true, data: readHist()[url.searchParams.get('agent') || ''] || [] })
+  }
+  // 还原某个会话的转录:claude CLI 存在 ~/.claude/projects/<cwd 编码>/<sid>.jsonl
+  if (url.pathname === '/api/chat/session' && req.method === 'GET') {
+    const sid = url.searchParams.get('id') || ''
+    if (!/^[a-f0-9-]{8,64}$/i.test(sid)) return send(400, { ok: false, error: 'id 非法' })
+    const file = path.join(process.env.HOME || '', '.claude', 'projects',
+      CHAT_CWD().replace(/[/.]/g, '-'), `${sid}.jsonl`)
+    if (!fs.existsSync(file)) return send(404, { ok: false, error: '会话转录不存在' })
+    const msgs = []
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      let ev; try { ev = JSON.parse(line) } catch { continue }
+      const content = ev?.message?.content
+      if (ev.type === 'user' && !ev.isMeta) {
+        const txt = typeof content === 'string' ? content
+          : Array.isArray(content) ? content.filter((b) => b.type === 'text').map((b) => b.text).join('') : ''
+        // 略过工具结果轮次和 <command-…> 之类的框架注入消息
+        if (txt.trim() && !txt.trimStart().startsWith('<')) msgs.push({ role: 'user', text: txt })
+      } else if (ev.type === 'assistant' && Array.isArray(content)) {
+        let last = msgs[msgs.length - 1]
+        if (!last || last.role !== 'ai') { last = { role: 'ai', text: '', tools: [] }; msgs.push(last) }
+        for (const b of content) {
+          if (b.type === 'text' && b.text) last.text += (last.text ? '\n\n' : '') + b.text
+          else if (b.type === 'tool_use') last.tools.push({ name: b.name, hint: '' })
+        }
+      }
+    }
+    return send(200, { ok: true, data: msgs })
+  }
   // AI 对话:流式透传本机 claude CLI 的 stream-json,认证复用 CLI 登录态。
   // 用 SSE(text/event-stream)而非裸 NDJSON——Cloudflare 边缘对 event-stream 不缓冲,流才顺。
   // 多轮靠 --resume <sessionId>;工作目录默认 $AGENT_ROOT;模型缺省 sonnet(快),config.env 的
@@ -204,18 +251,31 @@ http.createServer(async (req, res) => {
       if (a?.tools) args.push('--allowedTools', a.tools.split(/[\s,]+/).filter(Boolean).join(','))
     }
     args.push(...(readEnv('CHAT_ARGS') || '').split(/\s+/).filter(Boolean))
-    const cwd = AGENT_ROOT && fs.existsSync(AGENT_ROOT) ? AGENT_ROOT : ROOT
-    const child = spawn('claude', args, { cwd, env: process.env })
+    const child = spawn('claude', args, { cwd: CHAT_CWD(), env: process.env })
     res.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-cache', connection: 'keep-alive', 'x-accel-buffering': 'no',
     })
     const emit = (line) => { if (!res.writableEnded) res.write(`data: ${line}\n\n`) }
-    let out = '', errBuf = ''
+    let out = '', errBuf = '', recorded = false
     child.stdout.on('data', (c) => {
       out += c
       const lines = out.split('\n'); out = lines.pop()
-      for (const l of lines) if (l.trim()) emit(l)
+      for (const l of lines) {
+        if (!l.trim()) continue
+        // 首个带 session_id 的事件(init)出现时登记进会话历史
+        if (!recorded && l.includes('"session_id"')) {
+          try {
+            const ev = JSON.parse(l)
+            if (ev.session_id) {
+              recorded = true
+              recordSession(String(body.agent || ''), ev.session_id,
+                body.sessionId ? String(body.sessionId) : null, message.slice(0, 40))
+            }
+          } catch { /* 非完整 JSON 行,跳过 */ }
+        }
+        emit(l)
+      }
     })
     child.stderr.on('data', (c) => { errBuf += c })
     const finish = (errMsg) => {

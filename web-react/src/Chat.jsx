@@ -67,6 +67,15 @@ const groupTools = (tools) => {
   return order
 }
 
+// 历史会话时间戳 → 「x 分钟前」式相对时间
+const timeAgo = (ts) => {
+  const s = Math.max(0, (Date.now() - ts) / 1000)
+  if (s < 60) return '刚刚'
+  if (s < 3600) return `${Math.floor(s / 60)} 分钟前`
+  if (s < 86400) return `${Math.floor(s / 3600)} 小时前`
+  return `${Math.floor(s / 86400)} 天前`
+}
+
 // 图标既可以是 emoji 也可以是图片地址(与 App 的瓷贴同规则)
 const isImgIcon = (s) => /^(https?:)?\/\//.test(s || '') || (s || '').startsWith('/')
 const Ava = ({ icon, fallback = '✨' }) =>
@@ -81,6 +90,7 @@ export default function Chat({ open, agent, onClose }) {
   const [stick, setStick] = useState(true)   // 吸附底部:用户上滑看历史时松开,不再被流式输出拽回去
   const [model, setModel] = useState(localStorage.getItem('chat-model') || '')
   const [perm, setPerm] = useState(localStorage.getItem('chat-perm') || '')   // '' 只读 | acceptEdits | bypassPermissions
+  const [hist, setHist] = useState(null)   // null = 历史面板收起;数组 = 展开中的会话列表
   const modelRef = useRef(model)
   const permRef = useRef(perm)
   useEffect(() => { modelRef.current = model }, [model])
@@ -107,6 +117,7 @@ export default function Chat({ open, agent, onClose }) {
     keyRef.current = key
     setMsgs(s.msgs)
     sidRef.current = s.sid
+    setHist(null)
     setStick(true)
     inputRef.current?.focus()
   }, [key])
@@ -248,7 +259,32 @@ export default function Chat({ open, agent, onClose }) {
   const reset = () => {
     queueRef.current = []
     activeRef.current?.ctrl.abort()
-    setMsgs([]); sidRef.current = null; inputRef.current?.focus()
+    setMsgs([]); sidRef.current = null; setHist(null); inputRef.current?.focus()
+  }
+
+  // 历史会话:🕘 展开当前 agent 的最近会话(后端每个 agent 最多记 10 条)
+  const toggleHist = async () => {
+    if (hist) return setHist(null)
+    try {
+      const j = await (await fetch(`/api/chat/history?agent=${encodeURIComponent(key)}`)).json()
+      setHist(j.ok ? j.data : [])
+    } catch { setHist([]) }
+  }
+  // 选中历史会话:还原转录并 --resume 续聊;转录读不到也接上 session,只是不显示旧消息
+  const pickSession = async (s) => {
+    setHist(null)
+    queueRef.current = []
+    activeRef.current?.ctrl.abort()
+    sidRef.current = s.sid
+    try {
+      const j = await (await fetch(`/api/chat/session?id=${encodeURIComponent(s.sid)}`)).json()
+      if (!j.ok) throw new Error(j.error || '加载失败')
+      setMsgs(j.data.map((m) => (m.role === 'ai' ? { denied: [], ...m } : m)))
+    } catch (e) {
+      setMsgs([{ role: 'ai', text: `⚠️ 转录加载失败(${e.message}),已接上该会话,可直接继续对话。`, tools: [], denied: [] }])
+    }
+    setStick(true)
+    inputRef.current?.focus()
   }
 
   // 被拒后的一键授权重试:切到「可编辑」,续会话让它补做刚才被拒的操作
@@ -271,6 +307,7 @@ export default function Chat({ open, agent, onClose }) {
           <b>{agent?.name || 'AI 对话'}</b>
           <span className="chat-sub">{busy ? `思考中…${queued ? `(+${queued} 排队)` : ''}` : (sidRef.current ? '会话中' : '新会话')}</span>
           {busy && <button className="chat-hbtn" title="中断当前回答" onClick={stop}>⏹</button>}
+          <button className="chat-hbtn" title="历史会话" onClick={toggleHist}>🕘</button>
           <button className="chat-hbtn" title="新对话" onClick={reset}>↺</button>
           <button className="chat-hbtn" title="收起" onClick={onClose}>✕</button>
         </div>
@@ -286,6 +323,17 @@ export default function Chat({ open, agent, onClose }) {
             <option value="bypassPermissions">⚡ 全权限</option>
           </select>
         </div>
+        {hist && (
+          <div className="chat-hist">
+            {hist.length === 0 && <p className="hist-empty">暂无历史会话</p>}
+            {hist.map((s) => (
+              <button key={s.sid} className="hist-item" onClick={() => pickSession(s)}>
+                <span className="hist-title">{s.title || '(无标题)'}</span>
+                <span className="hist-time">{timeAgo(s.ts)}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="chat-body" ref={bodyRef} onScroll={onScroll}>
         {msgs.length === 0 && (
