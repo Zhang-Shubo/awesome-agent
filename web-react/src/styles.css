@@ -335,20 +335,19 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
   border-radius: 999px; font-size: 11px; padding: 3px 8px; outline: none; cursor: pointer; max-width: 118px;
 }
 
-/* 手机 PWA 内的 app 壳:全屏 iframe + 右下角小悬浮 ✕(只在 ≤640px 由 APP 瓷贴触发)。
-   壳顶留出状态栏安全区,免得 app 自己的头部顶进刘海/时钟 */
+/* 手机 PWA 内的 app 壳:iframe 全屏满铺(不留安全区色带,颜色全由 app 页面自己说了算)
+   + 右上角悬浮 ✕(只在 ≤640px 由 APP 瓷贴触发;按钮自己避开状态栏) */
 .appshell {
   position: fixed; inset: 0; z-index: 50;
   display: flex; flex-direction: column; background: var(--bg);
-  padding-top: env(safe-area-inset-top);
 }
 .appshell-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
 .appshell-close {
-  position: absolute; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom));
-  width: 30px; height: 30px; border-radius: 50%;
+  position: absolute; right: 12px; top: calc(10px + env(safe-area-inset-top));
+  width: 38px; height: 38px; border-radius: 50%;
   border: 1px solid var(--glass-border); background: var(--glass-strong);
   -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%);
-  color: var(--muted); font-size: 13px; cursor: pointer; opacity: 0.85;
+  color: var(--muted); font-size: 16px; cursor: pointer; opacity: 0.9;
   box-shadow: var(--shadow);
   display: flex; align-items: center; justify-content: center;
 }
