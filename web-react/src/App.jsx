@@ -277,7 +277,7 @@ export default function App() {
     <>
       <div className="aurora"><i /><i /><i /></div>
       <div className="shell">
-        {group('apps', 'APP', apps, (p) => (
+        {group('apps', 'App', apps, (p) => (
           <>
             <p className="pop-title">{p.name}
               <span className={`status ${p.status}`}><i />{STATUS[p.status] || p.status}</span></p>
@@ -297,7 +297,7 @@ export default function App() {
         (a) => { setChatAgent(a); setChatOpen(true) })}
         {widgets.length > 0 && !prefs.noWidget && (
           <section>
-            <h2>widget</h2>
+            <h2>Widget</h2>
             <div className="widgets">{widgets.map((w) => <Widget key={w.name} w={w} />)}</div>
           </section>
         )}
