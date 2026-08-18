@@ -335,37 +335,23 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
   border-radius: 999px; font-size: 11px; padding: 3px 8px; outline: none; cursor: pointer; max-width: 118px;
 }
 
-/* 手机 PWA 内的 app 壳:全屏 iframe + 顶部细返回栏(只在 ≤640px 由 APP 瓷贴触发) */
+/* 手机 PWA 内的 app 壳:全屏 iframe + 右下角小悬浮 ✕(只在 ≤640px 由 APP 瓷贴触发)。
+   壳顶留出状态栏安全区,免得 app 自己的头部顶进刘海/时钟 */
 .appshell {
   position: fixed; inset: 0; z-index: 50;
   display: flex; flex-direction: column; background: var(--bg);
-}
-.appshell-bar {
-  flex: none; display: flex; align-items: center; gap: 10px;
-  padding: 6px 10px; padding-top: calc(6px + env(safe-area-inset-top));
-  border-bottom: 1px solid var(--hairline);
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
-}
-.appshell-back {
-  width: 34px; height: 34px; border-radius: 50%; flex: none;
-  border: 1px solid var(--glass-border); background: var(--glass);
-  color: var(--text); font-size: 16px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.appshell-title {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.appshell-ico { width: 20px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 15px; }
-.appshell-ico img { width: 100%; height: 100%; border-radius: 6px; object-fit: cover; }
-.appshell-ext {
-  width: 34px; height: 34px; border-radius: 50%; flex: none;
-  border: 1px solid var(--glass-border); background: var(--glass);
-  color: var(--muted); font-size: 15px; text-decoration: none;
-  display: flex; align-items: center; justify-content: center;
+  padding-top: env(safe-area-inset-top);
 }
 .appshell-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
+.appshell-close {
+  position: absolute; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom));
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--glass-border); background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%);
+  color: var(--muted); font-size: 13px; cursor: pointer; opacity: 0.85;
+  box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+}
 
 /* ===== 手机适配(≤640px):悬浮按钮沉底、对话全屏、页面不横向晃动 ===== */
 @media (max-width: 640px) {

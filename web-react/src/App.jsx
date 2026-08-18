@@ -76,21 +76,12 @@ function Widget({ w, dragProps }) {
 }
 
 // 手机 PWA 内打开 app:standalone 模式下跳外域会弹出带地址栏的浏览器壳,
-// 改在面板里全屏 iframe 承载(自家服务都允许被 iframe),顶部细返回栏,↗ 兜底跳浏览器
+// 改在面板里全屏 iframe 承载(自家服务都允许被 iframe),右下角一颗小悬浮 ✕ 收回
 function AppShell({ app, onClose }) {
   return (
     <div className="appshell">
-      <div className="appshell-bar">
-        <button className="appshell-back" title="返回面板" onClick={onClose}>←</button>
-        <span className="appshell-title">
-          <span className="appshell-ico">
-            {isImgIcon(app.icon) ? <img src={app.icon} alt="" /> : (app.icon || '📦')}
-          </span>
-          {app.name}
-        </span>
-        <a className="appshell-ext" href={app.url} target="_blank" rel="noopener noreferrer" title="在浏览器打开">↗</a>
-      </div>
       <iframe className="appshell-frame" src={app.url} title={app.name} />
+      <button className="appshell-close" title="返回面板" onClick={onClose}>✕</button>
     </div>
   )
 }
