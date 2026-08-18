@@ -1,5 +1,6 @@
 ---
 name: claude-code
+icon: /icons/claude-code.svg
 kind: interactive
 runs-on: local
 entry: "claude"
