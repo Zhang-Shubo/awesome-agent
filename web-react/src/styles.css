@@ -238,8 +238,8 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 
 }
 .md hr { border: 0; border-top: 1px solid var(--glass-border); margin: 10px 0; }
 .md .tblwrap { overflow-x: auto; margin: 8px 0; }
-.md table { border-collapse: collapse; font-size: 12px; min-width: 60%; }
-.md th, .md td { border: 1px solid var(--glass-border); padding: 4px 8px; text-align: left; }
+.md table { border-collapse: collapse; font-size: 12px; min-width: 60%; width: max-content; max-width: 220%; }
+.md th, .md td { border: 1px solid var(--glass-border); padding: 4px 8px; text-align: left; word-break: normal; overflow-wrap: normal; }
 .md th { background: rgba(99, 102, 241, 0.08); }
 /* 流式中:末尾闪烁光标 */
 .md.live > *:last-child::after {
